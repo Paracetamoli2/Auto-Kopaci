@@ -1,0 +1,6 @@
+{
+  "name": "Program Inventari",
+  "description": "Sistem i avancuar për menaxhimin e inventarit të pjesëve të këmbimit, lëvizjeve të stokut, porosive dhe detyrimeve ndaj furnitorëve.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

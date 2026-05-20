@@ -1,0 +1,30 @@
+{
+  "short_name": "Inventari",
+  "name": "Program Inventari",
+  "description": "Sistem i avancuar për menaxhimin e inventarit të pjesëve të këmbimit.",
+  "icons": [
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#0f172a",
+  "theme_color": "#14b8a6",
+  "display": "standalone",
+  "orientation": "any"
+}

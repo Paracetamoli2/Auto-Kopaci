@@ -1,0 +1,701 @@
+import express from 'express';
+import path from 'path';
+import fs from 'fs';
+
+// Types for DB fallback mode
+interface DBData {
+  articles: any[];
+  movements: any[];
+  orders: any[];
+  payments: any[];
+}
+
+async function startServer() {
+  const app = express();
+  const PORT = 3000;
+
+  app.use(express.json());
+
+  // Database initialization logic with SQLite-to-JSON fallback cascade
+  let db: any = null;
+  let useFallback = false;
+  const fallbackPath = path.join(process.cwd(), 'database_fallback.json');
+
+  // Helper functions for reading and writing fallback JSON database safely
+  const readFallbackDB = async (): Promise<DBData> => {
+    try {
+      if (!fs.existsSync(fallbackPath)) {
+        const initial: DBData = { articles: [], movements: [], orders: [], payments: [] };
+        fs.writeFileSync(fallbackPath, JSON.stringify(initial, null, 2), 'utf8');
+        return initial;
+      }
+      const raw = fs.readFileSync(fallbackPath, 'utf8');
+      return JSON.parse(raw);
+    } catch (err) {
+      console.error('Gabim gjatë leximit të databazës së backup:', err);
+      return { articles: [], movements: [], orders: [], payments: [] };
+    }
+  };
+
+  const writeFallbackDB = async (data: DBData): Promise<void> => {
+    try {
+      fs.writeFileSync(fallbackPath, JSON.stringify(data, null, 2), 'utf8');
+    } catch (err) {
+      console.error('Gabim gjatë shkrimit në fletën e backup:', err);
+    }
+  };
+
+  try {
+    console.log('Duke provuar ngarkimin e SQLite për magazinën...');
+    
+    // Use dynamic import to prevent startup parse crashes if sqlite core binaries are missing
+    const { open } = await import('sqlite');
+    const sqlite3Pkg = await import('sqlite3');
+    
+    // Resolve CJS default/wrapped package structure
+    const sqlite3 = (sqlite3Pkg as any).default || sqlite3Pkg;
+
+    const dbPath = path.join(process.cwd(), 'database.db');
+    db = await open({
+      filename: dbPath,
+      driver: sqlite3.Database
+    });
+
+    // DB Schema Migration
+    await db.exec(`
+      CREATE TABLE IF NOT EXISTS articles (
+        code TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        category TEXT NOT NULL,
+        quantity INTEGER NOT NULL DEFAULT 0,
+        purchasePrice REAL NOT NULL DEFAULT 0,
+        salePrice REAL NOT NULL DEFAULT 0,
+        unit TEXT NOT NULL DEFAULT 'Cope',
+        createdAt TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS movements (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        articleCode TEXT NOT NULL,
+        type TEXT NOT NULL,
+        quantity INTEGER NOT NULL,
+        client TEXT,
+        repairNo TEXT,
+        unit TEXT,
+        date TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS orders (
+        id INTEGER PRIMARY KEY,
+        supplier TEXT NOT NULL,
+        date TEXT NOT NULL,
+        completed INTEGER NOT NULL DEFAULT 0,
+        total REAL NOT NULL DEFAULT 0,
+        items TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS payments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        supplier TEXT NOT NULL,
+        amount REAL NOT NULL,
+        date TEXT NOT NULL
+      );
+    `);
+
+    console.log('Baza e të dhënave SQLite u inicializua dhe u migrua me sukses!');
+  } catch (err: any) {
+    console.warn('VËREJTJE: Inicializimi i SQLite dështoi (mund të jetë për shkak të lidhjeve C++ në këtë mjedis).');
+    console.warn(`Arsyeja: ${err.message || err}`);
+    console.warn('Mbyllja e SQLite u shmang. Sistemi po kalon automatikisht në backup: database_fallback.json');
+    useFallback = true;
+  }
+
+  // API Endpoints
+
+  // Get current state for all elements
+  app.get('/api/state', async (req, res) => {
+    try {
+      if (!useFallback) {
+        const articles = await db.all('SELECT * FROM articles ORDER BY createdAt DESC');
+        const movements = await db.all('SELECT * FROM movements ORDER BY id DESC');
+        const payments = await db.all('SELECT * FROM payments ORDER BY id DESC');
+        
+        const rawOrders = await db.all('SELECT * FROM orders ORDER BY id DESC');
+        const orders = rawOrders.map((o: any) => ({
+          id: o.id,
+          supplier: o.supplier,
+          date: o.date,
+          completed: o.completed === 1,
+          total: o.total,
+          items: JSON.parse(o.items)
+        }));
+
+        return res.json({ articles, movements, orders, payments });
+      } else {
+        const data = await readFallbackDB();
+        // Sort helper to emulate SQLite orderings
+        const articles = [...data.articles].sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+        const movements = [...data.movements].sort((a, b) => b.id - a.id);
+        const payments = [...data.payments].sort((a, b) => b.id - a.id);
+        const orders = [...data.orders]
+          .sort((a, b) => b.id - a.id)
+          .map(o => ({
+            ...o,
+            completed: !!o.completed
+          }));
+
+        return res.json({ articles, movements, orders, payments });
+      }
+    } catch (err: any) {
+      console.error('Error fetching state:', err);
+      res.status(500).json({ error: 'Dështoi leximi i të dhënave të magazinës.' });
+    }
+  });
+
+  // Bulk sync/migration from client LocalStorage
+  app.post('/api/sync/import', async (req, res) => {
+    try {
+      const { articles = [], movements = [], orders = [], payments = [] } = req.body;
+
+      if (!useFallback) {
+        await db.run('BEGIN TRANSACTION');
+
+        for (const a of articles) {
+          await db.run(
+            `INSERT OR REPLACE INTO articles (code, name, category, quantity, purchasePrice, salePrice, unit, createdAt) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [a.code, a.name, a.category, a.quantity, a.purchasePrice, a.salePrice, a.unit || 'Cope', a.createdAt || new Date().toLocaleString('sq-AL')]
+          );
+        }
+
+        const currentMovesCountObj = await db.get('SELECT COUNT(*) as count FROM movements');
+        if (currentMovesCountObj.count === 0) {
+          for (const m of movements) {
+            await db.run(
+              `INSERT INTO movements (articleCode, type, quantity, client, repairNo, unit, date) 
+               VALUES (?, ?, ?, ?, ?, ?, ?)`,
+              [m.articleCode, m.type, m.quantity, m.client || '', m.repairNo || '', m.unit || 'Cope', m.date || new Date().toLocaleString('sq-AL')]
+            );
+          }
+        }
+
+        for (const o of orders) {
+          await db.run(
+            `INSERT OR REPLACE INTO orders (id, supplier, date, completed, total, items) 
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [o.id, o.supplier, o.date, o.completed ? 1 : 0, o.total, JSON.stringify(o.items)]
+          );
+        }
+
+        const currentPaymentsCountObj = await db.get('SELECT COUNT(*) as count FROM payments');
+        if (currentPaymentsCountObj.count === 0) {
+          for (const p of payments) {
+            await db.run(
+              `INSERT INTO payments (supplier, amount, date) VALUES (?, ?, ?)`,
+              [p.supplier, p.amount, p.date]
+            );
+          }
+        }
+
+        await db.run('COMMIT');
+      } else {
+        const data = await readFallbackDB();
+
+        articles.forEach((a: any) => {
+          const idx = data.articles.findIndex(x => x.code === a.code);
+          if (idx !== -1) data.articles[idx] = a;
+          else data.articles.push(a);
+        });
+
+        if (data.movements.length === 0) {
+          movements.forEach((m: any, i: number) => {
+            data.movements.push({ id: i + 1, ...m });
+          });
+        }
+
+        orders.forEach((o: any) => {
+          const idx = data.orders.findIndex(x => x.id === o.id);
+          const formatted = { ...o, completed: !!o.completed };
+          if (idx !== -1) data.orders[idx] = formatted;
+          else data.orders.push(formatted);
+        });
+
+        if (data.payments.length === 0) {
+          payments.forEach((p: any, i: number) => {
+            data.payments.push({ id: i + 1, ...p });
+          });
+        }
+
+        await writeFallbackDB(data);
+      }
+
+      res.json({ success: true, message: 'Sinkronizimi i parë u krye me sukses.' });
+    } catch (err: any) {
+      if (!useFallback) {
+        try { await db.run('ROLLBACK'); } catch {}
+      }
+      console.error('Sync failure:', err);
+      res.status(500).json({ error: 'U ndesh një gabim gjatë sinkronizimit të parë.' });
+    }
+  });
+
+  // Create or Update Article
+  app.post('/api/articles', async (req, res) => {
+    try {
+      const { code, name, category, quantity, purchasePrice, salePrice, unit, createdAt } = req.body;
+      if (!code || !name) {
+        return res.status(400).json({ error: 'Kodi dhe emri janë të detyrueshëm.' });
+      }
+
+      if (!useFallback) {
+        await db.run(
+          `INSERT OR REPLACE INTO articles (code, name, category, quantity, purchasePrice, salePrice, unit, createdAt) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [code, name, category, quantity, purchasePrice, salePrice, unit || 'Cope', createdAt || new Date().toLocaleString('sq-AL')]
+        );
+      } else {
+        const data = await readFallbackDB();
+        const existingIdx = data.articles.findIndex(a => a.code === code);
+        const article = {
+          code,
+          name,
+          category,
+          quantity: Number(quantity || 0),
+          purchasePrice: Number(purchasePrice || 0),
+          salePrice: Number(salePrice || 0),
+          unit: unit || 'Cope',
+          createdAt: createdAt || new Date().toLocaleString('sq-AL')
+        };
+        if (existingIdx !== -1) {
+          data.articles[existingIdx] = article;
+        } else {
+          data.articles.push(article);
+        }
+        await writeFallbackDB(data);
+      }
+
+      res.json({ success: true, article: req.body });
+    } catch (err) {
+      console.error('Error saving article:', err);
+      res.status(500).json({ error: 'Dështoi ruajtja e artikullit.' });
+    }
+  });
+
+  // Delete Article
+  app.delete('/api/articles/:code', async (req, res) => {
+    try {
+      const { code } = req.params;
+      if (!useFallback) {
+        await db.run('DELETE FROM articles WHERE code = ?', [code]);
+      } else {
+        const data = await readFallbackDB();
+        data.articles = data.articles.filter(a => a.code !== code);
+        await writeFallbackDB(data);
+      }
+      res.json({ success: true });
+    } catch (err) {
+      console.error('Error deleting article:', err);
+      res.status(500).json({ error: 'Dështoi fshirja e artikullit.' });
+    }
+  });
+
+  // Update Article Quantity
+  app.patch('/api/articles/:code/quantity', async (req, res) => {
+    try {
+      const { code } = req.params;
+      const { quantity } = req.body;
+
+      if (!useFallback) {
+        await db.run('UPDATE articles SET quantity = ? WHERE code = ?', [quantity, code]);
+      } else {
+        const data = await readFallbackDB();
+        const article = data.articles.find(a => a.code === code);
+        if (article) {
+          article.quantity = Number(quantity);
+          await writeFallbackDB(data);
+        }
+      }
+      res.json({ success: true });
+    } catch (err) {
+      console.error('Error updating quantity:', err);
+      res.status(500).json({ error: 'Dështoi përditësimi i sasisë.' });
+    }
+  });
+
+  // Register Stocks Movements
+  app.post('/api/movements', async (req, res) => {
+    try {
+      const movements = req.body; 
+      if (!Array.isArray(movements) || movements.length === 0) {
+        return res.status(400).json({ error: 'Regjistrimi i lëvizjes kërkon një listë jo-bosh.' });
+      }
+
+      if (!useFallback) {
+        await db.run('BEGIN TRANSACTION');
+
+        for (const m of movements) {
+          const dateStr = m.date || new Date().toLocaleString('sq-AL');
+          await db.run(
+            `INSERT INTO movements (articleCode, type, quantity, client, repairNo, unit, date) 
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [m.articleCode, m.type, m.quantity, m.client || '', m.repairNo || '', m.unit || 'Cope', dateStr]
+          );
+
+          const qtyToChange = Number(m.quantity);
+          if (m.type === 'DALJE') {
+            await db.run('UPDATE articles SET quantity = quantity - ? WHERE code = ?', [qtyToChange, m.articleCode]);
+          } else {
+            await db.run('UPDATE articles SET quantity = quantity + ? WHERE code = ?', [qtyToChange, m.articleCode]);
+          }
+        }
+
+        await db.run('COMMIT');
+      } else {
+        const data = await readFallbackDB();
+        const maxId = data.movements.reduce((max, m) => m.id > max ? m.id : max, 0);
+
+        movements.forEach((m: any, i: number) => {
+          const newM = {
+            id: maxId + 1 + i,
+            articleCode: m.articleCode,
+            type: m.type,
+            quantity: Number(m.quantity),
+            client: m.client || '',
+            repairNo: m.repairNo || '',
+            unit: m.unit || 'Cope',
+            date: m.date || new Date().toLocaleString('sq-AL')
+          };
+          data.movements.push(newM);
+
+          const art = data.articles.find(a => a.code === m.articleCode);
+          if (art) {
+            if (m.type === 'DALJE') {
+              art.quantity = Math.max(0, art.quantity - Number(m.quantity));
+            } else {
+              art.quantity += Number(m.quantity);
+            }
+          }
+        });
+
+        await writeFallbackDB(data);
+      }
+
+      res.json({ success: true });
+    } catch (err: any) {
+      if (!useFallback) {
+        try { await db.run('ROLLBACK'); } catch {}
+      }
+      console.error('Error saving movements:', err);
+      res.status(500).json({ error: 'Dështoi regjistrimi i lëvizjeve të stokut.' });
+    }
+  });
+
+  // Delete specific movement log
+  app.delete('/api/movements/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      if (!useFallback) {
+        await db.run('DELETE FROM movements WHERE id = ?', [id]);
+      } else {
+        const data = await readFallbackDB();
+        data.movements = data.movements.filter(m => m.id !== Number(id));
+        await writeFallbackDB(data);
+      }
+      res.json({ success: true });
+    } catch (err) {
+      console.error('Error deleting movement:', err);
+      res.status(500).json({ error: 'Dështoi heqja e lëvizjes.' });
+    }
+  });
+
+  // Clear all movements logs
+  app.post('/api/movements/clear', async (req, res) => {
+    try {
+      if (!useFallback) {
+        await db.run('DELETE FROM movements');
+      } else {
+        const data = await readFallbackDB();
+        data.movements = [];
+        await writeFallbackDB(data);
+      }
+      res.json({ success: true });
+    } catch (err) {
+      console.error('Error clearing movements:', err);
+      res.status(500).json({ error: 'Dështoi pastrimi i historikut.' });
+    }
+  });
+
+  // Create Supply Order
+  app.post('/api/orders', async (req, res) => {
+    try {
+      const o = req.body;
+      if (!o.id || !o.supplier) {
+        return res.status(400).json({ error: 'Informacioni i poronisë nuk është i plotë.' });
+      }
+
+      if (!useFallback) {
+        await db.run(
+          `INSERT OR REPLACE INTO orders (id, supplier, date, completed, total, items) 
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [o.id, o.supplier, o.date, o.completed ? 1 : 0, o.total, JSON.stringify(o.items)]
+        );
+      } else {
+        const data = await readFallbackDB();
+        const existingIdx = data.orders.findIndex(x => x.id === o.id);
+        const order = {
+          id: o.id,
+          supplier: o.supplier,
+          date: o.date,
+          completed: !!o.completed,
+          total: Number(o.total || 0),
+          items: o.items || []
+        };
+        if (existingIdx !== -1) {
+          data.orders[existingIdx] = order;
+        } else {
+          data.orders.push(order);
+        }
+        await writeFallbackDB(data);
+      }
+
+      res.json({ success: true, order: o });
+    } catch (err) {
+      console.error('Error creating order:', err);
+      res.status(500).json({ error: 'Dështoi krijimi i porosisë.' });
+    }
+  });
+
+  // Complete Supply Order & Allocate Quantities
+  app.post('/api/orders/:id/complete', async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      if (!useFallback) {
+        const order = await db.get('SELECT * FROM orders WHERE id = ?', [id]);
+        if (!order) {
+          return res.status(404).json({ error: 'Porosia nuk u gjet.' });
+        }
+
+        if (order.completed === 1) {
+          return res.status(400).json({ error: 'Kjo porosi është pranuar tashmë.' });
+        }
+
+        const items = JSON.parse(order.items);
+
+        await db.run('BEGIN TRANSACTION');
+
+        for (const item of items) {
+          const itemCode = item.article.toUpperCase().replace(/\s+/g, '-');
+          
+          const existing = await db.get('SELECT * FROM articles WHERE name = ? OR code = ?', [item.article, itemCode]);
+          if (existing) {
+            await db.run('UPDATE articles SET quantity = quantity + ? WHERE code = ?', [Number(item.quantity), existing.code]);
+          } else {
+            await db.run(
+              `INSERT INTO articles (code, name, category, quantity, purchasePrice, salePrice, unit, createdAt) 
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+              [
+                itemCode,
+                item.article,
+                'Shtuar me Porosi',
+                Number(item.quantity),
+                Number(item.price),
+                Math.round(Number(item.price) * 1.3),
+                item.unit || 'Cope',
+                new Date().toLocaleString('sq-AL')
+              ]
+            );
+          }
+        }
+
+        await db.run('UPDATE orders SET completed = 1 WHERE id = ?', [id]);
+        await db.run('COMMIT');
+      } else {
+        const data = await readFallbackDB();
+        const order = data.orders.find(o => o.id === Number(id));
+        if (!order) {
+          return res.status(404).json({ error: 'Porosia nuk u gjet.' });
+        }
+        if (order.completed) {
+          return res.status(400).json({ error: 'Kjo porosi është pranuar tashmë.' });
+        }
+
+        for (const item of order.items) {
+          const itemCode = item.article.toUpperCase().replace(/\s+/g, '-');
+          const existing = data.articles.find(a => a.name.toLowerCase() === item.article.toLowerCase() || a.code === itemCode);
+          if (existing) {
+            existing.quantity += Number(item.quantity);
+          } else {
+            data.articles.push({
+              code: itemCode,
+              name: item.article,
+              category: 'Shtuar me Porosi',
+              quantity: Number(item.quantity),
+              purchasePrice: Number(item.price),
+              salePrice: Math.round(Number(item.price) * 1.3),
+              unit: item.unit || 'Cope',
+              createdAt: new Date().toLocaleString('sq-AL')
+            });
+          }
+        }
+
+        order.completed = true;
+        await writeFallbackDB(data);
+      }
+
+      res.json({ success: true });
+    } catch (err: any) {
+      if (!useFallback) {
+        try { await db.run('ROLLBACK'); } catch {}
+      }
+      console.error('Error completing order:', err);
+      res.status(500).json({ error: 'Dështoi pranimi i poronisë.' });
+    }
+  });
+
+  // Create Supplier Payment
+  app.post('/api/payments', async (req, res) => {
+    try {
+      const { supplier, amount, date } = req.body;
+      if (!supplier || amount === undefined) {
+        return res.status(400).json({ error: 'Të dhënat e pagesës janë të mangëta.' });
+      }
+
+      let insertedId = 0;
+
+      if (!useFallback) {
+        const result = await db.run(
+          `INSERT INTO payments (supplier, amount, date) VALUES (?, ?, ?)`,
+          [supplier, amount, date || new Date().toLocaleString('sq-AL')]
+        );
+        insertedId = result.lastID || Date.now();
+      } else {
+        const data = await readFallbackDB();
+        const maxId = data.payments.reduce((max, p) => p.id > max ? p.id : max, 0);
+        insertedId = maxId + 1;
+        
+        data.payments.push({
+          id: insertedId,
+          supplier,
+          amount: Number(amount),
+          date: date || new Date().toLocaleString('sq-AL')
+        });
+        await writeFallbackDB(data);
+      }
+
+      res.json({ success: true, payment: { id: insertedId, supplier, amount, date } });
+    } catch (err) {
+      console.error('Error saving payment:', err);
+      res.status(500).json({ error: 'Dështoi regjistrimi i pagesës.' });
+    }
+  });
+
+  // Bulk Import for Google Sheets synchronization overwriting
+  app.post('/api/sync/sheets-import', async (req, res) => {
+    try {
+      const articlesList = req.body;
+      if (!Array.isArray(articlesList)) {
+        return res.status(400).json({ error: 'Të dhënat e importuara duhet të jenë një listë.' });
+      }
+
+      if (!useFallback) {
+        await db.run('BEGIN TRANSACTION');
+
+        for (const imp of articlesList) {
+          await db.run(
+            `INSERT OR REPLACE INTO articles (code, name, category, quantity, purchasePrice, salePrice, unit, createdAt) 
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              imp.code,
+              imp.name,
+              imp.category,
+              imp.quantity,
+              imp.purchasePrice,
+              imp.salePrice,
+              imp.unit,
+              imp.createdAt || new Date().toLocaleString('sq-AL')
+            ]
+          );
+        }
+
+        await db.run('COMMIT');
+      } else {
+        const data = await readFallbackDB();
+
+        for (const imp of articlesList) {
+          const existingIdx = data.articles.findIndex(a => a.code === imp.code);
+          const art = {
+            code: imp.code,
+            name: imp.name,
+            category: imp.category,
+            quantity: Number(imp.quantity || 0),
+            purchasePrice: Number(imp.purchasePrice || 0),
+            salePrice: Number(imp.salePrice || 0),
+            unit: imp.unit || 'Cope',
+            createdAt: imp.createdAt || new Date().toLocaleString('sq-AL')
+          };
+          if (existingIdx !== -1) {
+            data.articles[existingIdx] = art;
+          } else {
+            data.articles.push(art);
+          }
+        }
+
+        await writeFallbackDB(data);
+      }
+
+      res.json({ success: true, count: articlesList.length });
+    } catch (err: any) {
+      if (!useFallback) {
+        try { await db.run('ROLLBACK'); } catch {}
+      }
+      console.error('Sheets import backend failure:', err);
+      res.status(500).json({ error: 'Gabim gjatë sinkronizimit të backend-it me fletën Google.' });
+    }
+  });
+
+
+  // Serve frontend files
+  if (process.env.NODE_ENV !== 'production') {
+    const { createServer: createViteServer } = await import('vite');
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
+
+    // Serve index.html transformed by Vite for any other route in dev mode
+    app.use('*', async (req, res, next) => {
+      const url = req.originalUrl;
+      try {
+        const indexPath = path.join(process.cwd(), 'index.html');
+        if (fs.existsSync(indexPath)) {
+          let template = fs.readFileSync(indexPath, 'utf-8');
+          template = await vite.transformIndexHtml(url, template);
+          res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+        } else {
+          next();
+        }
+      } catch (e: any) {
+        vite.ssrFixStacktrace(e);
+        next(e);
+      }
+    });
+  } else {
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  }
+
+  app.listen(PORT, '0.0.0.0', () => {
+    const mode = useFallback ? 'Backup JSON File Mode' : 'Native SQLite Mode';
+    console.log(`Bllokuesi u thye. Serveri po punon në mënyrën [${mode}] në adresën: http://localhost:${PORT}`);
+  });
+}
+
+startServer().catch(err => {
+  console.error('Dështoi rinisja e serverit kryesor full-stack:', err);
+  process.exit(1);
+});

@@ -149,19 +149,30 @@ export function AiAssistant({ onRefreshState }: AiAssistantProps) {
       });
 
       if (!res.ok) {
-        const errData = await res.json();
-        if (errData.status === 'key_missing') {
-          setApiKeyError(true);
-          setMessages(prev => [...prev, {
-            role: 'model',
-            text: '⚠️ Çelësi i API-it të Gemini mungon. Ju lutemi klikoni butonin "Settings" (⚙️) në krye të djathtë të faqeve rregulluese të AI Studio për të shtuar çelësin tuaj të zotëruar si sekret me emrin "GEMINI_API_KEY".',
-            isHelpfulAlert: true
-          }]);
-        } else {
-          throw new Error(errData.error || 'Server error');
+        let errMsg = 'Gabim i panjohur nga serveri.';
+        try {
+          const contentType = res.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const errData = await res.json();
+            if (errData.status === 'key_missing') {
+              setApiKeyError(true);
+              setMessages(prev => [...prev, {
+                role: 'model',
+                text: '⚠️ Çelësi i API-it të Gemini mungon. Ju lutemi klikoni butonin me ikonën e cilësimeve (⚙️) sipër në fushën e asistentit për të vendosur çelësin tuaj personal të API-it, ose shtojeni atë në mjedisin e Render me emrin "GEMINI_API_KEY".',
+                isHelpfulAlert: true
+              }]);
+              setIsProcessing(false);
+              return;
+            }
+            errMsg = errData.error || errData.message || errMsg;
+          } else {
+            const textData = await res.text();
+            errMsg = textData.substring(0, 200) || `Serveri ktheu statusin ${res.status}`;
+          }
+        } catch (e) {
+          errMsg = `Gabim gjatë leximit të përgjigjes së serverit (Statusi: ${res.status})`;
         }
-        setIsProcessing(false);
-        return;
+        throw new Error(errMsg);
       }
 
       const data = await res.json();
@@ -179,11 +190,12 @@ export function AiAssistant({ onRefreshState }: AiAssistantProps) {
       if (data.refreshNeeded) {
         await onRefreshState();
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error talking to AI:', err);
+      const readableError = err.message || String(err);
       setMessages(prev => [...prev, {
         role: 'model',
-        text: 'Më vjen keq, ndodhi një gabim gjatë komunikimit me serverin AI. Sigurohuni që jeni lidhur me internetin dhe keni cilësuar çelësin e saktë AP-i.'
+        text: `❌ Ndodhi një gabim gjatë komunikimit me serverin AI.\n\nDetajet e gabimit:\n"${readableError}"\n\nJu lutemi sigurohuni që jeni lidhur me internetin, apo keni vendosur një Gemini API Key të vlefshëm tek ikona ⚙️.`
       }]);
     } finally {
       setIsProcessing(false);

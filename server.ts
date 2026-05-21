@@ -805,11 +805,11 @@ async function startServer() {
   app.post('/api/gemini/chat', async (req, res) => {
     try {
       const { message, history = [], userApiKey } = req.body;
-      const apiKey = (userApiKey && userApiKey.trim()) || process.env.GEMINI_API_KEY;
+      const apiKey = (userApiKey && userApiKey.trim()) || (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim());
       if (!apiKey) {
         return res.status(400).json({
           status: 'key_missing',
-          error: 'Ju lutemi vendosni çelësin tuaj GEMINI_API_KEY në opsionet ose në panelin Settings > Secrets të AI Studio për të përdorur asistentin zanor.'
+          error: 'Ju lutemi vendosni çelësin tuaj GEMINI_API_KEY në opsionet e asistentit (ikona ⚙️) ose shtojeni atë në mjedisin e përndarë (Render).'
         });
       }
 

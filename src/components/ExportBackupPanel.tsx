@@ -29,6 +29,7 @@ interface ExportBackupPanelProps {
     orders: Order[];
     payments: Payment[];
   }) => Promise<boolean>;
+  onResetDatabase: () => Promise<boolean>;
   showFeedback: (msg: string, type?: 'success' | 'error') => void;
 }
 
@@ -38,6 +39,7 @@ export function ExportBackupPanel({
   orders,
   payments,
   onImportBackup,
+  onResetDatabase,
   showFeedback
 }: ExportBackupPanelProps) {
   const [activeTab, setActiveTab] = useState<'DATABASE' | 'CODE' | 'GUIDE'>('DATABASE');
@@ -408,6 +410,42 @@ CREATE TABLE IF NOT EXISTS payments (
                 <li>Pagesa të Dokumentuara: <span className="font-bold text-blue-600">{payments.length}</span> transaksione</li>
               </ul>
             </div>
+          </div>
+
+          {/* Danger Zone / Zona e Rrezikut */}
+          <div className="border border-red-200 bg-red-50/40 p-5 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mt-6">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-red-100 text-red-650 rounded-lg shrink-0 mt-0.5">
+                <AlertCircle className="w-4 h-4 text-red-600" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-red-950">Zona e Rrezikut: Rinis/Reseto të gjithë Databazën</h4>
+                <p className="text-[11px] text-red-700/80 leading-relaxed mt-0.5">
+                  Kjo do të fshijë përgjithmonë të gjithë artikujt nga stoku, lëvizjet e historikut, fletë-porositë e krijuara dhe pagesat. Çdo gjë do të riniset nga e para. Ky veprim është i pakthyeshëm.
+                </p>
+              </div>
+            </div>
+            
+            <button
+              type="button"
+              onClick={async () => {
+                const conf1 = window.confirm("⚠️ Paralajmërim: A jeni absolutisht i sigurt që dëshironi të fshini të GJIThË të dhënat e magazinës (Artikujt, Historikun, Porositë)?");
+                if (conf1) {
+                  const conf2 = window.confirm("🛑 Ky hap është i pakthyeshëm! Klikoni OK për ta resetuar databazën plotësisht.");
+                  if (conf2) {
+                    const success = await onResetDatabase();
+                    if (success) {
+                      showFeedback("Baza e të dhënave u pastrua me sukses! Çdo gjë u rikthye në fillim.", "success");
+                    } else {
+                      showFeedback("Dështoi pastrimi ose rinisja e bazës së të dhënave.", "error");
+                    }
+                  }
+                }
+              }}
+              className="cursor-pointer text-center md:whitespace-nowrap bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-xl text-xs transition duration-150 shadow-md shadow-red-100 self-stretch md:self-auto"
+            >
+              Fshi Gjithçka (Reset)
+            </button>
           </div>
         </div>
       )}

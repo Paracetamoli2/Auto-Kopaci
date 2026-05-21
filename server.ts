@@ -425,6 +425,152 @@ async function startServer() {
     }
   });
 
+  // Completely Reset Database (Clear all tables)
+  app.post('/api/reset', async (req, res) => {
+    try {
+      if (!useFallback) {
+        await db.run('DELETE FROM articles');
+        await db.run('DELETE FROM movements');
+        await db.run('DELETE FROM orders');
+        await db.run('DELETE FROM payments');
+      } else {
+        const initialCount: DBData = { articles: [], movements: [], orders: [], payments: [] };
+        await writeFallbackDB(initialCount);
+      }
+      res.json({ success: true });
+    } catch (err) {
+      console.error('Error resetting database:', err);
+      res.status(500).json({ error: 'Dështoi fshirja e plotë e databazës.' });
+    }
+  });
+
+  // Delete specific payment endpoint
+  app.delete('/api/payments/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      if (!useFallback) {
+        await db.run('DELETE FROM payments WHERE id = ?', [id]);
+      } else {
+        const data = await readFallbackDB();
+        data.payments = data.payments.filter(p => p.id !== Number(id));
+        await writeFallbackDB(data);
+      }
+      res.json({ success: true });
+    } catch (err) {
+      console.error('Error deleting payment:', err);
+      res.status(500).json({ error: 'Dështoi fshirja e pagesës.' });
+    }
+  });
+
+  // Delete specific order endpoint
+  app.delete('/api/orders/:id', async (req, res) => {
+    try {
+      const { id } = req.params;
+      if (!useFallback) {
+        await db.run('DELETE FROM orders WHERE id = ?', [id]);
+      } else {
+        const data = await readFallbackDB();
+        data.orders = data.orders.filter(o => o.id !== Number(id));
+        await writeFallbackDB(data);
+      }
+      res.json({ success: true });
+    } catch (err) {
+      console.error('Error deleting order:', err);
+      res.status(500).json({ error: 'Dështoi fshirja e porosisë.' });
+    }
+  });
+
+  // Bulk deletion administrator endpoint
+  app.post('/api/admin/bulk-delete', async (req, res) => {
+    try {
+      const { type, filterType, filterValue } = req.body;
+      if (!type || !filterType) {
+        return res.status(400).json({ error: 'Të dhënat janë të paplota.' });
+      }
+
+      if (!useFallback) {
+        if (type === 'articles') {
+          if (filterType === 'all') {
+            await db.run('DELETE FROM articles');
+          } else if (filterType === 'category') {
+            await db.run('DELETE FROM articles WHERE category = ?', [filterValue]);
+          } else if (filterType === 'single') {
+            await db.run('DELETE FROM articles WHERE code = ?', [filterValue]);
+          }
+        } else if (type === 'movements') {
+          if (filterType === 'all') {
+            await db.run('DELETE FROM movements');
+          } else if (filterType === 'category') {
+            await db.run(`
+              DELETE FROM movements 
+              WHERE articleCode IN (SELECT code FROM articles WHERE category = ?)
+            `, [filterValue]);
+          } else if (filterType === 'single') {
+            await db.run('DELETE FROM movements WHERE id = ?', [filterValue]);
+          }
+        } else if (type === 'orders') {
+          if (filterType === 'all') {
+            await db.run('DELETE FROM orders');
+          } else if (filterType === 'category') {
+            await db.run('DELETE FROM orders WHERE supplier = ?', [filterValue]);
+          } else if (filterType === 'single') {
+            await db.run('DELETE FROM orders WHERE id = ?', [filterValue]);
+          }
+        } else if (type === 'payments') {
+          if (filterType === 'all') {
+            await db.run('DELETE FROM payments');
+          } else if (filterType === 'category') {
+            await db.run('DELETE FROM payments WHERE supplier = ?', [filterValue]);
+          } else if (filterType === 'single') {
+            await db.run('DELETE FROM payments WHERE id = ?', [filterValue]);
+          }
+        }
+      } else {
+        const data = await readFallbackDB();
+        if (type === 'articles') {
+          if (filterType === 'all') {
+            data.articles = [];
+          } else if (filterType === 'category') {
+            data.articles = data.articles.filter(a => a.category !== filterValue);
+          } else if (filterType === 'single') {
+            data.articles = data.articles.filter(a => a.code !== filterValue);
+          }
+        } else if (type === 'movements') {
+          if (filterType === 'all') {
+            data.movements = [];
+          } else if (filterType === 'category') {
+            const forbiddenCodes = new Set(data.articles.filter(a => a.category === filterValue).map(a => a.code));
+            data.movements = data.movements.filter(m => !forbiddenCodes.has(m.articleCode));
+          } else if (filterType === 'single') {
+            data.movements = data.movements.filter(m => m.id !== Number(filterValue));
+          }
+        } else if (type === 'orders') {
+          if (filterType === 'all') {
+            data.orders = [];
+          } else if (filterType === 'category') {
+            data.orders = data.orders.filter(o => o.supplier !== filterValue);
+          } else if (filterType === 'single') {
+            data.orders = data.orders.filter(o => o.id !== Number(filterValue));
+          }
+        } else if (type === 'payments') {
+          if (filterType === 'all') {
+            data.payments = [];
+          } else if (filterType === 'category') {
+            data.payments = data.payments.filter(p => p.supplier !== filterValue);
+          } else if (filterType === 'single') {
+            data.payments = data.payments.filter(p => p.id !== Number(filterValue));
+          }
+        }
+        await writeFallbackDB(data);
+      }
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error('Error during bulk-delete:', err);
+      res.status(500).json({ error: 'Fshirja në masë dështoi.' });
+    }
+  });
+
   // Create Supply Order
   app.post('/api/orders', async (req, res) => {
     try {

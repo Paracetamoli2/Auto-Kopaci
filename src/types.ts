@@ -47,6 +47,7 @@ export interface Order {
 }
 
 export interface Payment {
+  id?: number;
   supplier: string;
   amount: number;
   date: string;

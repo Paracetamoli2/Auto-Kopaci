@@ -34,6 +34,7 @@ import { LiabilityCard } from './components/LiabilityCard';
 import { MovementHistory } from './components/MovementHistory';
 import { SheetsPanel } from './components/SheetsPanel';
 import { ExportBackupPanel } from './components/ExportBackupPanel';
+import { DatabaseAdminPanel } from './components/DatabaseAdminPanel';
 
 const DATABASE_ITEMS: DatabaseItem[] = [
   { name: 'Vaj Motorri 5W30', category: 'Lubrifikant' },
@@ -62,7 +63,7 @@ export default function App() {
   const [pendingOrderItems, setPendingOrderItems] = useState<OrderItem[]>([]);
   const [pendingMovementItems, setPendingMovementItems] = useState<Movement[]>([]);
   const [currentTime, setCurrentTime] = useState('');
-  const [activePanel, setActivePanel] = useState<'NONE' | 'LIABILITIES' | 'ORDERS' | 'HISTORY' | 'SHEETS' | 'BACKUP'>('NONE');
+  const [activePanel, setActivePanel] = useState<'NONE' | 'LIABILITIES' | 'ORDERS' | 'HISTORY' | 'SHEETS' | 'BACKUP' | 'DATABASE_ADMIN'>('NONE');
 
   const [customTemplates, setCustomTemplates] = useState<DatabaseItem[]>(() => {
     try {
@@ -79,9 +80,33 @@ export default function App() {
   // Load and Migrate State from SQLite
   useEffect(() => {
     const initDbState = async () => {
+      let response: Response | null = null;
+      let retries = 4;
+      let delayMs = 1000;
+      
+      while (retries > 0) {
+        try {
+          response = await fetch('/api/state');
+          if (response.ok) {
+            break; // Successfully connected!
+          }
+          throw new Error(`Server status: ${response.status}`);
+        } catch (err: any) {
+          retries--;
+          if (retries === 0) {
+            console.error('All state fetch attempts failed. Proceeding with offline LocalStorage fallback:', err);
+            break;
+          }
+          console.warn(`Connection to local database/server failed, retrying in ${delayMs}ms... (${retries} attempts left)`, err);
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+          delayMs *= 1.5; // Exponential backoff scaling
+        }
+      }
+
       try {
-        const response = await fetch('/api/state');
-        if (!response.ok) throw new Error('Dështoi komunikimi me serverin.');
+        if (!response || !response.ok) {
+          throw new Error('Dështoi komunikimi përfundimtar me serverin për sinkronizim.');
+        }
         const data = await response.json();
 
         // Check if DB is brand new/empty, and check if user has local items to migrate
@@ -115,7 +140,7 @@ export default function App() {
             throw new Error('Migrimi dështoi.');
           }
         } else {
-          // Success case - Populate state directly from SQLite
+          // Success case - Populate state directly from SQLite / fallback json
           setArticles(data.articles || []);
           setMovements(data.movements || []);
           setOrders(data.orders || []);
@@ -542,6 +567,22 @@ export default function App() {
     }
   };
 
+  const handleResetDatabase = async (): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/reset', {
+        method: 'POST'
+      });
+      if (!res.ok) throw new Error();
+      localStorage.removeItem('custom_templates');
+      setCustomTemplates([]);
+      await refreshState();
+      return true;
+    } catch (err) {
+      console.error(err);
+      return false;
+    }
+  };
+
   const suppliers = ['Autopasion', 'Intercars', 'Te tjera'];
 
   return (
@@ -705,6 +746,18 @@ export default function App() {
               <Database className="w-4 h-4 shrink-0 text-blue-600" />
               Eksporto & Backup
             </button>
+
+            <button
+              onClick={() => setActivePanel(activePanel === 'DATABASE_ADMIN' ? 'NONE' : 'DATABASE_ADMIN')}
+              className={`flex-1 sm:flex-none cursor-pointer text-xs font-bold py-2.5 px-4 rounded-xl border transition-all duration-200 flex items-center justify-center gap-2 ${
+                activePanel === 'DATABASE_ADMIN'
+                  ? 'bg-rose-105 bg-rose-100 border-rose-400 text-rose-700 shadow-sm font-bold'
+                  : 'bg-rose-50 hover:bg-rose-100 border-rose-200 text-rose-600'
+              }`}
+            >
+              <Database className="w-4 h-4 shrink-0 text-rose-500" />
+              Menaxhimi i Databazës ⚙️
+            </button>
           </div>
         </div>
 
@@ -769,6 +822,19 @@ export default function App() {
                     orders={orders}
                     payments={payments}
                     onImportBackup={handleImportBackup}
+                    onResetDatabase={handleResetDatabase}
+                    showFeedback={showFeedback}
+                  />
+                </div>
+              )}
+              {activePanel === 'DATABASE_ADMIN' && (
+                <div className="pb-2">
+                  <DatabaseAdminPanel
+                    articles={articles}
+                    movements={movements}
+                    orders={orders}
+                    payments={payments}
+                    onRefresh={refreshState}
                     showFeedback={showFeedback}
                   />
                 </div>

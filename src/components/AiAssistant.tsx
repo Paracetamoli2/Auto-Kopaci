@@ -164,6 +164,15 @@ export function AiAssistant({ onRefreshState }: AiAssistantProps) {
               setIsProcessing(false);
               return;
             }
+            if (errData.status === 'quota_exceeded') {
+              setMessages(prev => [...prev, {
+                role: 'model',
+                text: '⚠️ **Limiti i Kuotës u Tejkalua (429 RESOURCE_EXHAUSTED)**\n\nKeni kaluar limitet e lejuara të përdorimit falas të çelësit të API-it të Gemini (Free Tier për modelin aktual ka të caktuar një limit ditor apo për minutë prej 20 kërkesash).\n\n**Si ta zgjidhni:**\n1. Ju lutemi prisni 1-2 minuta dhe provoni përsëri.\n2. Klikoni butonin e cilësimeve (**⚙️**) lart në asistent dhe vendosni një Gemini API Key asocijativ personal të rregullt.\n3. Aktivizoni opsionin Billing në Google AI Studio për të patur kërkesa të pakufizuara.',
+                isHelpfulAlert: true
+              }]);
+              setIsProcessing(false);
+              return;
+            }
             errMsg = errData.error || errData.message || errMsg;
           } else {
             const textData = await res.text();

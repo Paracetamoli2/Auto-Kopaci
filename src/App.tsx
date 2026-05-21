@@ -35,6 +35,7 @@ import { MovementHistory } from './components/MovementHistory';
 import { SheetsPanel } from './components/SheetsPanel';
 import { ExportBackupPanel } from './components/ExportBackupPanel';
 import { DatabaseAdminPanel } from './components/DatabaseAdminPanel';
+import { AiAssistant } from './components/AiAssistant';
 
 const DATABASE_ITEMS: DatabaseItem[] = [
   { name: 'Vaj Motorri 5W30', category: 'Lubrifikant' },
@@ -883,6 +884,9 @@ export default function App() {
             <span>Sistemi është plotësisht funksional dhe i mbrojtur offline</span>
           </div>
         </footer>
+        
+        {/* Voice AI Assistant widget */}
+        <AiAssistant onRefreshState={refreshState} />
 
       </div>
     </div>

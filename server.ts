@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import { GoogleGenAI, Type, FunctionDeclaration } from '@google/genai';
 
 // Types for DB fallback mode
 interface DBData {
@@ -797,6 +798,371 @@ async function startServer() {
       }
       console.error('Sheets import backend failure:', err);
       res.status(500).json({ error: 'Gabim gjatë sinkronizimit të backend-it me fletën Google.' });
+    }
+  });
+
+  // AI Gemini Chat endpoint with auto function calling handling (Tools)
+  app.post('/api/gemini/chat', async (req, res) => {
+    try {
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey) {
+        return res.status(400).json({
+          status: 'key_missing',
+          error: 'Ju lutemi vendosni çelësin tuaj GEMINI_API_KEY në panelin Settings > Secrets të AI Studio për të përdorur asistentin zanor.'
+        });
+      }
+
+      const { message, history = [] } = req.body;
+      if (!message) {
+        return res.status(400).json({ error: 'Mesazhi nuk mund të jetë bosh.' });
+      }
+
+      // Initialize server-side Gemini client
+      const aiClient = new GoogleGenAI({
+        apiKey: apiKey,
+        httpOptions: {
+          headers: {
+            'User-Agent': 'aistudio-build'
+          }
+        }
+      });
+
+      // Declare high quality warehouse tools in Albanian
+      const shtoArtikullTool: FunctionDeclaration = {
+        name: "shto_artikull",
+        description: "Regjistron një artikull (pjesë këmbimi, produkt) të ri në magazinë apo përditëson çmimet e tij.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            code: { type: Type.STRING, description: "Kodi unik SKU i produktit, p.sh., 'CASTROL-5W30', 'FIL-AJRI-BMW' (konvertohet automatikisht në shkronja të mëdha)" },
+            name: { type: Type.STRING, description: "Emri i plotë i produktit të ri në magazinë" },
+            category: { type: Type.STRING, description: "Kategoria e produktit (p.sh., Lubrifikant, Filtra, Elektrike, Motor, Aksesore, Sistem Frenimi)" },
+            quantity: { type: Type.NUMBER, description: "Sasia fillestare ose sasia që do të jetë në magazinë" },
+            purchasePrice: { type: Type.NUMBER, description: "Çmimi i blerjes në euro (€)" },
+            salePrice: { type: Type.NUMBER, description: "Çmimi i vlerësuar i shitjes për klientin në euro (€)" },
+            unit: { type: Type.STRING, description: "Njësia e matjes, p.sh., 'Cope', 'Liter', 'Set' (mungesa nënkupton 'Cope')" }
+          },
+          required: ["code", "name", "category", "quantity", "purchasePrice", "salePrice"]
+        }
+      };
+
+      const regjistroLevizjeTool: FunctionDeclaration = {
+        name: "regjistro_levizje",
+        description: "Regjistron një lëvizje stoku për hyrje apo dalje (shitje malli ndaj klientit, ose shtim manual).",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            articleCode: { type: Type.STRING, description: "Kodi SKU i artikullit që po lëviz (p.sh. CASTROL-5W30)" },
+            type: { type: Type.STRING, description: "Lloji i lëvizjes: duhet të jetë vetëm 'HYRJE' ose 'DALJE'" },
+            quantity: { type: Type.NUMBER, description: "Sasia e mallit që lëviz" },
+            client: { type: Type.STRING, description: "Emri i klientit (mjaft i rëndësishëm sidomos për lëvizjet DALJE / Shitje)" },
+            repairNo: { type: Type.STRING, description: "Koment ose shënime të shkurtra për riparimin e kryer (opsionale, p.sh. 'Ndërrim vaji, filtra')" },
+            unit: { type: Type.STRING, description: "Njësia e matjes (p.sh., 'Cope')" }
+          },
+          required: ["articleCode", "type", "quantity"]
+        }
+      };
+
+      const krijoPorosiTool: FunctionDeclaration = {
+        name: "krijo_porosi",
+        description: "Krijon një porosi të re furnizimi (porosi aktive) me mallra të ndryshme nga një furnitor por nuk i shton direkt në stok derisa të pranohet.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            supplier: { type: Type.STRING, description: "Emri i kompanisë apo personit furnitor (p.sh. Autopasion, Intercars)" },
+            total: { type: Type.NUMBER, description: "Vlera totale e porosisë në euro (€)" },
+            items: {
+              type: Type.ARRAY,
+              description: "Lista e artikujve të porositur",
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  article: { type: Type.STRING, description: "Emri i artikullit të porositur" },
+                  quantity: { type: Type.NUMBER, description: "Sasia e porositur" },
+                  price: { type: Type.NUMBER, description: "Çmimi i blerjes për njësi në euro (€)" },
+                  unit: { type: Type.STRING, description: "Njësia e matjes (p.sh., Cope)" }
+                },
+                required: ["article", "quantity", "price"]
+              }
+            }
+          },
+          required: ["supplier", "total", "items"]
+        }
+      };
+
+      const regjistroPageseTool: FunctionDeclaration = {
+        name: "regjistro_pagese",
+        description: "Regjistron një pagesë financiare të kryer ndaj detyrimit të një furnitori.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            supplier: { type: Type.STRING, description: "Emri i furnitorit ndaj të cilit kryhet pagesa" },
+            amount: { type: Type.NUMBER, description: "Shuma e paguar në euro (€)" },
+            date: { type: Type.STRING, description: "Data e kryerjes së pagesës (opsionale, format DD/MM/YYYY)" }
+          },
+          required: ["supplier", "amount"]
+        }
+      };
+
+      const lexoGjendjenStokutTool: FunctionDeclaration = {
+        name: "lexo_gjendjen_stokut",
+        description: "Lexon të gjithë gjendjen aktuale të magazinës (artikujt e regjistruar, sasinë, çmimet, porositë dhe historikun e lëvizjeve). Thirreni gjithmonë kur përdoruesi pyet sa artikuj ka, cilët janë në gjendje të ulët, sa është vlera totale ose historiku.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {}
+        }
+      };
+
+      // Construct message history and current query
+      const userMessageContent = { role: 'user', parts: [{ text: message }] };
+      const contents = [...history, userMessageContent];
+
+      let refreshNeeded = false;
+      const actionsExecuted: string[] = [];
+      let loopCount = 0;
+      const maxLoops = 5;
+      let finalPayload: any = null;
+
+      while (loopCount < maxLoops) {
+        loopCount++;
+
+        const response = await aiClient.models.generateContent({
+          model: 'gemini-3.5-flash',
+          contents: contents,
+          config: {
+            systemInstruction: "Ju jeni Asistenti Inteligjent AI i 'Auto Servis Kopaçi'. Përdoruesi do të komunikojë me ju kryesisht në Shqip (apo ndonjëherë në Anglisht), me zë ose me shkrim. Detyra juaj kryesore është të kuptoni qëllimin e tyre dhe të kryeni veprime në bazë të kërkesave duke thirrur funksionet 'shto_artikull', 'regjistro_levizje', 'krijo_porosi', 'regjistro_pagese', ose 'lexo_gjendjen_stokut'. Përgjigjuni gjithmonë në Gjuhën Shqipe në mënyrë të qartë, të thjeshtë, profesionale dhe përmbledhëse. Nëse përdoruesi ju kërkon me zë ose me shkrim të shtojë pjesë, bëjë pagesa, ose bëjë urdhër-porosi, përdorni vegla. Pas kryerjes me sukses të veprimit, konfirmoni se çfarë bëtë.",
+            tools: [{ functionDeclarations: [shtoArtikullTool, regjistroLevizjeTool, krijoPorosiTool, regjistroPageseTool, lexoGjendjenStokutTool] }],
+            toolConfig: { includeServerSideToolInvocations: true }
+          }
+        });
+
+        const functionCalls = response.functionCalls;
+        if (!functionCalls || functionCalls.length === 0) {
+          // No more function calls, we have the final human-readable text!
+          finalPayload = {
+            message: response.text || 'Operacioni u krye me sukses.',
+            refreshNeeded,
+            actionsExecuted,
+            history: [...contents, response.candidates?.[0]?.content]
+          };
+          break;
+        }
+
+        // Execute function calls
+        const functionResponses = [];
+        for (const call of functionCalls) {
+          const { name, args, id } = call;
+          let result: any = null;
+
+          try {
+            if (name === 'lexo_gjendjen_stokut') {
+              let articlesList: any[] = [];
+              let movementsList: any[] = [];
+              let ordersList: any[] = [];
+              let paymentsList: any[] = [];
+
+              if (!useFallback) {
+                articlesList = await db.all('SELECT * FROM articles');
+                movementsList = await db.all('SELECT * FROM movements');
+                paymentsList = await db.all('SELECT * FROM payments');
+                const rawOrders = await db.all('SELECT * FROM orders');
+                ordersList = rawOrders.map((o: any) => ({
+                  id: o.id,
+                  supplier: o.supplier,
+                  date: o.date,
+                  completed: o.completed === 1,
+                  total: o.total,
+                  items: JSON.parse(o.items)
+                }));
+              } else {
+                const fallbackData = await readFallbackDB();
+                articlesList = fallbackData.articles;
+                movementsList = fallbackData.movements;
+                ordersList = fallbackData.orders;
+                paymentsList = fallbackData.payments;
+              }
+
+              result = { articles: articlesList, movements: movementsList, orders: ordersList, payments: paymentsList };
+            } else if (name === 'shto_artikull') {
+              const { code, name: artName, category, quantity, purchasePrice, salePrice, unit } = args as any;
+              const codeUpper = String(code).toUpperCase().trim();
+
+              if (!useFallback) {
+                await db.run(
+                  `INSERT OR REPLACE INTO articles (code, name, category, quantity, purchasePrice, salePrice, unit, createdAt) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                  [codeUpper, artName, category, Number(quantity || 0), Number(purchasePrice || 0), Number(salePrice || 0), unit || 'Cope', new Date().toLocaleString('sq-AL')]
+                );
+              } else {
+                const data = await readFallbackDB();
+                const existingIdx = data.articles.findIndex(a => a.code === codeUpper);
+                const item = {
+                  code: codeUpper,
+                  name: artName,
+                  category,
+                  quantity: Number(quantity || 0),
+                  purchasePrice: Number(purchasePrice || 0),
+                  salePrice: Number(salePrice || 0),
+                  unit: unit || 'Cope',
+                  createdAt: new Date().toLocaleString('sq-AL')
+                };
+                if (existingIdx !== -1) {
+                  data.articles[existingIdx] = item;
+                } else {
+                  data.articles.push(item);
+                }
+                await writeFallbackDB(data);
+              }
+
+              result = { success: true, message: `Artikulli '${artName}' u regjistrua me kod ${codeUpper}.` };
+              refreshNeeded = true;
+              actionsExecuted.push(`Shtuar Artikulli i Ri: ${artName} (${codeUpper})`);
+            } else if (name === 'regjistro_levizje') {
+              const { articleCode, type: movType, quantity, client, repairNo, unit } = args as any;
+              const qtyVal = Number(quantity);
+              const dateVal = new Date().toLocaleString('sq-AL');
+              const codeUpper = String(articleCode).toUpperCase().trim();
+              let articleFound = false;
+
+              if (!useFallback) {
+                const art = await db.get('SELECT * FROM articles WHERE code = ?', [codeUpper]);
+                if (art) {
+                  articleFound = true;
+                  await db.run('BEGIN TRANSACTION');
+                  await db.run(
+                    `INSERT INTO movements (articleCode, type, quantity, client, repairNo, unit, date) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                    [codeUpper, movType, qtyVal, client || '', repairNo || '', unit || 'Cope', dateVal]
+                  );
+                  if (movType === 'DALJE') {
+                    await db.run('UPDATE articles SET quantity = MAX(0, quantity - ?) WHERE code = ?', [qtyVal, codeUpper]);
+                  } else {
+                    await db.run('UPDATE articles SET quantity = quantity + ? WHERE code = ?', [qtyVal, codeUpper]);
+                  }
+                  await db.run('COMMIT');
+                }
+              } else {
+                const data = await readFallbackDB();
+                const art = data.articles.find(a => a.code === codeUpper);
+                if (art) {
+                  articleFound = true;
+                  const maxId = data.movements.reduce((max, m) => m.id > max ? m.id : max, 0);
+                  data.movements.push({
+                    id: maxId + 1,
+                    articleCode: codeUpper,
+                    type: movType,
+                    quantity: qtyVal,
+                    client: client || '',
+                    repairNo: repairNo || '',
+                    unit: unit || 'Cope',
+                    date: dateVal
+                  });
+                  if (movType === 'DALJE') {
+                    art.quantity = Math.max(0, art.quantity - qtyVal);
+                  } else {
+                    art.quantity += qtyVal;
+                  }
+                  await writeFallbackDB(data);
+                }
+              }
+
+              if (articleFound) {
+                result = { success: true, message: `Lëvizja e tipit '${movType}' për sasinë ${qtyVal} u regjistrua me sukses.` };
+                refreshNeeded = true;
+                actionsExecuted.push(`Regjistruar Lëvizje: ${movType} (${qtyVal} ${unit || 'Cope'})`);
+              } else {
+                result = { error: `Gabim: Artikulli me kodin '${articleCode}' nuk ekziston në magazinë.` };
+              }
+            } else if (name === 'krijo_porosi') {
+              const { supplier, total, items } = args as any;
+              const orderId = Date.now();
+              const dateVal = new Date().toLocaleString('sq-AL');
+
+              if (!useFallback) {
+                await db.run(
+                  `INSERT OR REPLACE INTO orders (id, supplier, date, completed, total, items) 
+                   VALUES (?, ?, ?, ?, ?, ?)`,
+                  [orderId, supplier, dateVal, 0, Number(total || 0), JSON.stringify(items)]
+                );
+              } else {
+                const data = await readFallbackDB();
+                data.orders.push({
+                  id: orderId,
+                  supplier,
+                  date: dateVal,
+                  completed: false,
+                  total: Number(total || 0),
+                  items
+                });
+                await writeFallbackDB(data);
+              }
+
+              result = { success: true, orderId, message: `Urdhër-porosia u krijua me sukses.` };
+              refreshNeeded = true;
+              actionsExecuted.push(`Krijuar Porosi Furnizimi: ${supplier} (€ ${total})`);
+            } else if (name === 'regjistro_pagese') {
+              const { supplier, amount, date } = args as any;
+              const dateVal = date || new Date().toLocaleString('sq-AL');
+
+              if (!useFallback) {
+                await db.run(
+                  `INSERT INTO payments (supplier, amount, date) VALUES (?, ?, ?)`,
+                  [supplier, Number(amount || 0), dateVal]
+                );
+              } else {
+                const data = await readFallbackDB();
+                const maxId = data.payments.reduce((max, p) => p.id > max ? p.id : max, 0);
+                data.payments.push({
+                  id: maxId + 1,
+                  supplier,
+                  amount: Number(amount || 0),
+                  date: dateVal
+                });
+                await writeFallbackDB(data);
+              }
+
+              result = { success: true, message: `U regjistrua pagesa prej € ${amount} për furnitorin '${supplier}'.` };
+              refreshNeeded = true;
+              actionsExecuted.push(`Regjistruar Pagesë: ${supplier} (€ ${amount})`);
+            }
+          } catch (ex: any) {
+            console.error(`Ekskursion gjatë ekzekutimit të mjetit ${name}:`, ex);
+            result = { error: ex.message || String(ex) };
+          }
+
+          functionResponses.push({
+            name,
+            response: { result },
+            id
+          });
+        }
+
+        // Add model's choice to call function & the returned tool output answer to context
+        contents.push(response.candidates?.[0]?.content as any);
+        contents.push({
+          role: 'user', // representing the tool execution role response
+          parts: functionResponses.map(f => ({
+            functionResponse: {
+              name: f.name,
+              response: f.response
+            }
+          }))
+        } as any);
+      }
+
+      if (!finalPayload) {
+        finalPayload = {
+          message: 'Më vjen keq, u arrit limiti i thirrjeve të brendshme pa marrë një mesazh përfundimtar.',
+          refreshNeeded,
+          actionsExecuted,
+          history: contents
+        };
+      }
+
+      res.json(finalPayload);
+    } catch (err: any) {
+      console.error('Gabim gjatë procesimit të Gemini:', err);
+      res.status(500).json({ error: 'Ndodhi një gabim gjatë përpunimit të inteligjencës artificiale: ' + (err.message || String(err)) });
     }
   });
 

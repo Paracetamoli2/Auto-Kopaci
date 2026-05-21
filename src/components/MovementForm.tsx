@@ -64,7 +64,7 @@ export function MovementForm({
   const handleWhatsAppShare = () => {
     const dateStr = new Date().toLocaleDateString('sq-AL');
     const currentClientName = client.trim() || 'Klient i Përgjithshëm';
-    const currentRepairNo = repairNo.trim() ? ` / Nr.Riparimi: ${repairNo.trim()}` : '';
+    const currentRepairNo = repairNo.trim() ? ` / Koment: ${repairNo.trim()}` : '';
 
     let text = `*📋 AUTOSERVIS - FLETË POROSIE*\n\n`;
     text += `*👤 Klienti:* ${currentClientName}${currentRepairNo}\n`;
@@ -113,7 +113,8 @@ export function MovementForm({
       articleCode: selectedDetails.code, // use actual code
       type,
       quantity: qty,
-      client: client.trim() ? `${client.trim()}${repairNo.trim() ? ` / Nr.Riparimi: ${repairNo.trim()}` : ''}` : (repairNo.trim() ? `Nr.Riparimi: ${repairNo.trim()}` : ''),
+      client: client.trim(),
+      repairNo: repairNo.trim(),
       unit: selectedDetails.unit,
     };
 
@@ -283,20 +284,20 @@ export function MovementForm({
                 placeholder="p.sh. Albert Kopaçi"
                 value={client}
                 onChange={(e) => setClient(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition duration-200"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition duration-200"
               />
             </div>
 
             <div>
               <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                Nr. Riparimi (Opsionale)
+                Koment mbi Riparimin (Opsionale)
               </label>
               <input
                 type="text"
-                placeholder="p.sh. AA-342"
+                placeholder="p.sh. Ndërrimi i vajit dhe filtrave..."
                 value={repairNo}
                 onChange={(e) => setRepairNo(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition duration-200"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition duration-200"
               />
             </div>
           </div>
@@ -366,9 +367,11 @@ export function MovementForm({
                     </span>
                     <span>{getArticleNameByCode(pm.articleCode)}</span>
                   </div>
-                  {pm.client && (
+                  {(pm.client || pm.repairNo) && (
                     <span className="text-[10px] text-slate-400">
-                      Marrësi: {pm.client}
+                      {pm.client ? `Marrësi: ${pm.client}` : ''}
+                      {pm.client && pm.repairNo ? ' | ' : ''}
+                      {pm.repairNo ? `Koment: ${pm.repairNo}` : ''}
                     </span>
                   )}
                 </div>
@@ -469,9 +472,9 @@ export function MovementForm({
                     <span className="font-bold text-slate-900">{client.trim() || 'Klient i Përgjithshëm'}</span>
                   </div>
                   {repairNo.trim() && (
-                    <div className="flex justify-between">
-                      <span className="text-slate-400 font-bold uppercase text-[9px]">Nr. Karta / Riparimi:</span>
-                      <span className="font-mono font-bold text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200/40">{repairNo}</span>
+                    <div className="flex justify-between items-start gap-3">
+                      <span className="text-slate-400 font-bold uppercase text-[9px] shrink-0">Koment / Shënime:</span>
+                      <span className="font-sans font-bold text-slate-800 text-right">{repairNo}</span>
                     </div>
                   )}
                   <div className="flex justify-between">

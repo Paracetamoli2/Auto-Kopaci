@@ -463,8 +463,8 @@ export function DatabaseAdminPanel({
                             </span>
                           </td>
                           <td className="p-3 font-mono font-bold text-slate-800">{m.quantity} {m.unit || 'Cope'}</td>
-                          <td className="p-3 text-slate-500 truncate max-w-[150px]">
-                            {m.client || m.repairNo ? `${m.client || ''} ${m.repairNo ? `[Karta: ${m.repairNo}]` : ''}` : '-'}
+                          <td className="p-3 text-slate-500 truncate max-w-[200px]" title={m.repairNo || ''}>
+                            {m.client || m.repairNo ? `${m.client || ''} ${m.repairNo ? `[Koment: ${m.repairNo}]` : ''}` : '-'}
                           </td>
                           <td className="p-3 text-right">
                             <button

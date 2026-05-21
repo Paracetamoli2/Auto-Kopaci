@@ -18,7 +18,12 @@ import {
   Search,
   CheckCircle,
   XCircle,
-  RefreshCw
+  RefreshCw,
+  Lock,
+  Eye,
+  EyeOff,
+  KeyRound,
+  ShieldAlert
 } from 'lucide-react';
 import { Article, Movement, Order, Payment } from '../types';
 
@@ -39,9 +44,28 @@ export function DatabaseAdminPanel({
   onRefresh,
   showFeedback,
 }: DatabaseAdminPanelProps) {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    return sessionStorage.getItem('db_admin_authenticated') === 'true';
+  });
+  const [password, setPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
   const [activeSubTab, setActiveSubTab] = useState<'ARTICLES' | 'MOVEMENTS' | 'LIABILITIES'>('ARTICLES');
   const [searchQuery, setSearchQuery] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleVerifyPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password === 'Albertkopaci12@') {
+      setIsAuthenticated(true);
+      sessionStorage.setItem('db_admin_authenticated', 'true');
+      setPasswordError('');
+      showFeedback('U identifikuat me sukses në panelin administrativ!', 'success');
+    } else {
+      setPasswordError('Fjalëkalimi i vendosur është i pasaktë! Provojeni përsëri.');
+    }
+  };
 
   // Group categories dynamically
   const categoriesMap = articles.reduce((acc, a) => {
@@ -116,6 +140,68 @@ export function DatabaseAdminPanel({
       setIsDeleting(false);
     }
   };
+
+  if (!isAuthenticated) {
+    return (
+      <div className="bg-white border border-slate-200 rounded-2xl p-6 sm:p-10 shadow-md relative overflow-hidden flex flex-col items-center justify-center min-h-[380px] max-w-md mx-auto my-4 transition duration-200 animate-fade-in">
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-500 via-rose-500 to-amber-500"></div>
+        <div className="absolute -top-12 -right-12 w-28 h-28 bg-rose-500/5 rounded-full blur-2xl pointer-events-none"></div>
+        <div className="absolute -bottom-12 -left-12 w-28 h-28 bg-amber-500/5 rounded-full blur-2xl pointer-events-none"></div>
+
+        <div className="p-4 bg-rose-50 border border-rose-100 rounded-full text-rose-600 mb-5 relative shrink-0">
+          <Lock className="w-8 h-8 stroke-[2.2]" />
+          <div className="absolute -bottom-1 -right-1 p-1 bg-amber-500 border border-white text-white rounded-full">
+            <KeyRound className="w-3 h-3 stroke-[2.5]" />
+          </div>
+        </div>
+
+        <h3 className="text-base sm:text-lg font-black text-slate-800 text-center tracking-tight">
+          Autorizim i Kërkuar ⚙️
+        </h3>
+        <p className="text-xs text-slate-500 text-center mt-2 mb-6 max-w-[285px] leading-relaxed">
+          Për të hapur panelin administrativ dhe për të bërë fshirje artikujsh, lëvizjesh apo detyrimesh, ju lutem shkruani fjalëkalimin e sigurisë.
+        </p>
+
+        <form onSubmit={handleVerifyPassword} className="w-full space-y-4">
+          <div className="relative">
+            <input
+              type={showPassword ? 'text' : 'password'}
+              placeholder="Shkruaj fjalëkalimin këtu..."
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (passwordError) setPasswordError('');
+              }}
+              className="w-full bg-slate-50 hover:bg-slate-100/50 border border-slate-200 rounded-xl pl-4 pr-10 py-3 text-sm text-slate-800 font-sans focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-400 transition duration-150 text-center font-semibold"
+              autoFocus
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3.5 top-3.5 text-slate-400 hover:text-slate-650 cursor-pointer focus:outline-none"
+            >
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+
+          {passwordError && (
+            <div className="flex items-center gap-2 text-xs text-rose-600 bg-rose-50 border border-rose-100/60 p-3 rounded-xl">
+              <ShieldAlert className="w-4 h-4 shrink-0 stroke-[2.2]" />
+              <span className="font-medium text-left leading-normal">{passwordError}</span>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            className="w-full py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold leading-none tracking-wider uppercase shadow-md shadow-rose-100/60 font-sans cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2"
+          >
+            <Lock className="w-3.5 h-3.5 stroke-[2.5]" />
+            <span>Hyr në Panel</span>
+          </button>
+        </form>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm relative overflow-hidden h-full flex flex-col">

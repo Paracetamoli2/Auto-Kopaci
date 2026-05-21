@@ -16,6 +16,7 @@ import {
   CheckCircle,
   XCircle,
   TrendingDown,
+  TrendingUp,
   Activity,
   Landmark,
   ShoppingBag
@@ -36,6 +37,7 @@ import { SheetsPanel } from './components/SheetsPanel';
 import { ExportBackupPanel } from './components/ExportBackupPanel';
 import { DatabaseAdminPanel } from './components/DatabaseAdminPanel';
 import { AiAssistant } from './components/AiAssistant';
+import { SalesDashboard } from './components/SalesDashboard';
 
 const DATABASE_ITEMS: DatabaseItem[] = [
   { name: 'Vaj Motorri 5W30', category: 'Lubrifikant' },
@@ -64,7 +66,7 @@ export default function App() {
   const [pendingOrderItems, setPendingOrderItems] = useState<OrderItem[]>([]);
   const [pendingMovementItems, setPendingMovementItems] = useState<Movement[]>([]);
   const [currentTime, setCurrentTime] = useState('');
-  const [activePanel, setActivePanel] = useState<'NONE' | 'LIABILITIES' | 'ORDERS' | 'HISTORY' | 'SHEETS' | 'BACKUP' | 'DATABASE_ADMIN'>('NONE');
+  const [activePanel, setActivePanel] = useState<'NONE' | 'LIABILITIES' | 'ORDERS' | 'HISTORY' | 'SHEETS' | 'BACKUP' | 'DATABASE_ADMIN' | 'SALES_DASHBOARD'>('NONE');
 
   const [customTemplates, setCustomTemplates] = useState<DatabaseItem[]>(() => {
     try {
@@ -761,6 +763,18 @@ export default function App() {
               <Database className="w-4 h-4 shrink-0 text-rose-500" />
               Menaxhimi i Databazës ⚙️
             </button>
+
+            <button
+              onClick={() => setActivePanel(activePanel === 'SALES_DASHBOARD' ? 'NONE' : 'SALES_DASHBOARD')}
+              className={`flex-1 sm:flex-none cursor-pointer text-xs font-bold py-2.5 px-4 rounded-xl border transition-all duration-200 flex items-center justify-center gap-2 ${
+                activePanel === 'SALES_DASHBOARD'
+                  ? 'bg-amber-100 border-amber-300 text-amber-800 shadow-sm font-bold'
+                  : 'bg-amber-50 hover:bg-amber-100/80 border-amber-200 text-amber-700'
+              }`}
+            >
+              <TrendingUp className="w-4 h-4 shrink-0 text-amber-500" />
+              Shitjet &amp; Financat 📈
+            </button>
           </div>
         </div>
 
@@ -839,6 +853,14 @@ export default function App() {
                     payments={payments}
                     onRefresh={refreshState}
                     showFeedback={showFeedback}
+                  />
+                </div>
+              )}
+              {activePanel === 'SALES_DASHBOARD' && (
+                <div className="pb-2">
+                  <SalesDashboard
+                    articles={articles}
+                    movements={movements}
                   />
                 </div>
               )}

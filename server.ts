@@ -804,15 +804,15 @@ async function startServer() {
   // AI Gemini Chat endpoint with auto function calling handling (Tools)
   app.post('/api/gemini/chat', async (req, res) => {
     try {
-      const apiKey = process.env.GEMINI_API_KEY;
+      const { message, history = [], userApiKey } = req.body;
+      const apiKey = (userApiKey && userApiKey.trim()) || process.env.GEMINI_API_KEY;
       if (!apiKey) {
         return res.status(400).json({
           status: 'key_missing',
-          error: 'Ju lutemi vendosni çelësin tuaj GEMINI_API_KEY në panelin Settings > Secrets të AI Studio për të përdorur asistentin zanor.'
+          error: 'Ju lutemi vendosni çelësin tuaj GEMINI_API_KEY në opsionet ose në panelin Settings > Secrets të AI Studio për të përdorur asistentin zanor.'
         });
       }
 
-      const { message, history = [] } = req.body;
       if (!message) {
         return res.status(400).json({ error: 'Mesazhi nuk mund të jetë bosh.' });
       }

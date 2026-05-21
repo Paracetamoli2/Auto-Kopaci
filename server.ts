@@ -927,7 +927,7 @@ async function startServer() {
         loopCount++;
 
         const response = await aiClient.models.generateContent({
-          model: 'gemini-3.5-flash',
+          model: 'gemini-1.5-flash',
           contents: contents,
           config: {
             systemInstruction: "Ju jeni Asistenti Inteligjent AI i 'Auto Servis Kopaçi'. Përdoruesi do të komunikojë me ju kryesisht në Shqip (apo ndonjëherë në Anglisht), me zë ose me shkrim. Detyra juaj kryesore është të kuptoni qëllimin e tyre dhe të kryeni veprime në bazë të kërkesave duke thirrur funksionet 'shto_artikull', 'regjistro_levizje', 'krijo_porosi', 'regjistro_pagese', ose 'lexo_gjendjen_stokut'. Përgjigjuni gjithmonë në Gjuhën Shqipe në mënyrë të qartë, të thjeshtë, profesionale dhe përmbledhëse. Nëse përdoruesi ju kërkon me zë ose me shkrim të shtojë pjesë, bëjë pagesa, ose bëjë urdhër-porosi, përdorni vegla. Pas kryerjes me sukses të veprimit, konfirmoni se çfarë bëtë.",

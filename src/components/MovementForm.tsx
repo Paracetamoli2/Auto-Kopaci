@@ -139,15 +139,15 @@ export function MovementForm({
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm relative overflow-hidden h-full flex flex-col justify-between">
-      <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl pointer-events-none"></div>
+      <div className="absolute top-0 right-0 w-24 h-24 bg-slate-500/5 rounded-full blur-2xl pointer-events-none"></div>
 
       <div>
         <div className="flex items-center gap-3 mb-5">
-          <div className="p-2 sm:p-2.5 bg-blue-50 rounded-xl text-blue-600">
-            <ArrowDownUp className="w-5 h-5" />
+          <div className="p-2 sm:p-2.5 bg-slate-900 border border-slate-950 rounded-xl text-amber-500">
+            <ArrowDownUp className="w-5 h-5 stroke-[2.2]" />
           </div>
           <div>
-            <h2 className="text-base sm:text-lg font-bold font-display text-slate-800">
+            <h2 className="text-base sm:text-lg font-bold text-slate-900">
               Regjistro Hyrje/Dalje (Transaksione)
             </h2>
             <p className="text-xs text-slate-500">Menaxho mbërritjen e mallrave ose shitjet e klientëve</p>
@@ -171,7 +171,7 @@ export function MovementForm({
                   setSelectedArticleName(''); // clear selected until chosen
                   setIsSearchDropdownOpen(true);
                 }}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-3 pr-8 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition duration-200"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-3 pr-8 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition duration-200"
               />
               <div className="absolute right-3 top-3 text-slate-400 pointer-events-none">
                 <Search className="w-3.5 h-3.5" />
@@ -193,8 +193,8 @@ export function MovementForm({
                         }}
                         className="w-full text-left px-3.5 py-2.5 text-xs hover:bg-slate-50 text-slate-800 transition flex justify-between items-center"
                       >
-                        <span className="font-medium">{a.name}</span>
-                        <span className="text-[10px] bg-slate-100 font-mono text-slate-500 px-1.5 py-0.5 rounded font-bold">
+                        <span className="font-medium text-slate-900">{a.name}</span>
+                        <span className="text-[10px] bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded font-bold font-sans">
                           {a.code ? `Sasi: ${a.quantity || 0} ${a.unit || 'Cope'}` : '(Jo në stok)'}
                         </span>
                       </button>
@@ -235,7 +235,7 @@ export function MovementForm({
               </div>
               <div>
                 <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Kategoria:</span>{' '}
-                <span className="text-blue-600 font-bold ml-1">
+                <span className="text-slate-700 font-bold ml-1 bg-slate-200/60 px-2 py-0.5 rounded">
                   {selectedDetails.category}
                 </span>
               </div>
@@ -250,7 +250,7 @@ export function MovementForm({
               <select
                 value={type}
                 onChange={(e) => setType(e.target.value as 'DALJE' | 'HYRJE')}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2.5 text-sm text-slate-800 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition duration-200"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2.5 text-sm text-slate-800 font-bold focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition duration-200"
               >
                 <option value="DALJE">DALJE (Shitje / Riparim)</option>
                 <option value="HYRJE">HYRJE (Furnizim / Manual)</option>
@@ -268,7 +268,7 @@ export function MovementForm({
                 placeholder="0"
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 font-mono text-center focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition duration-200"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 font-mono text-center focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition duration-200"
               />
             </div>
           </div>

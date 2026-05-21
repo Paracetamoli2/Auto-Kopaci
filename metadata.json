@@ -1,6 +1,6 @@
 {
-  "name": "Program Inventari",
-  "description": "Sistem i avancuar për menaxhimin e inventarit të pjesëve të këmbimit, lëvizjeve të stokut, porosive dhe detyrimeve ndaj furnitorëve.",
+  "name": "Auto Servis Kopaci",
+  "description": "Sistem profesional për menaxhimin e inventarit të pjesëve të këmbimit, lëvizjeve të stokut, dhe llogarive të servisit 'Auto Servis Kopaci'.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

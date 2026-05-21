@@ -29,32 +29,32 @@ export function StatsGrid({
       value: mergedStockCount,
       sub: 'Përfshirë katalogun bazë',
       icon: Package,
-      color: 'border-slate-200 text-slate-900',
-      iconColor: 'text-blue-600 bg-blue-50',
+      color: 'bg-white border-slate-200 text-slate-900',
+      iconColor: 'text-amber-500 bg-amber-50/80',
     },
     {
       title: 'Lëvizje Stoku',
       value: movementsCount,
-      sub: 'Hyrje dhe dalje të regjistruara',
+      sub: 'Hyrje/dalje të kryera',
       icon: ArrowDownUp,
-      color: 'border-slate-200 text-slate-900',
-      iconColor: 'text-indigo-600 bg-indigo-50',
+      color: 'bg-white border-slate-200 text-slate-900',
+      iconColor: 'text-slate-700 bg-slate-100',
     },
     {
       title: 'Vlera e Stokut',
       value: `€ ${totalStockValue.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-      sub: 'Bazuar në çmimin e blerjes',
+      sub: 'Vlera aktuale e magazinës',
       icon: Euro,
-      color: 'border-slate-200 border-l-4 border-l-blue-600 text-slate-900',
-      iconColor: 'text-emerald-600 bg-emerald-50',
+      color: 'bg-slate-900 border-slate-950 text-white shadow-lg shadow-slate-900/10',
+      iconColor: 'text-amber-400 bg-slate-800 border border-slate-700/60',
     },
     {
       title: 'Stok i Ulët',
       value: lowStockItemsCount,
-      sub: 'Artikuj me 3 ose më pak njësi',
+      sub: 'Kërkojnë furnizim të shpejtë',
       icon: AlertCircle,
-      color: lowStockItemsCount > 0 ? 'border-amber-200 text-amber-700 bg-amber-50/20' : 'border-slate-200 text-slate-900',
-      iconColor: lowStockItemsCount > 0 ? 'text-amber-600 bg-amber-50 animate-pulse' : 'text-slate-400 bg-slate-100',
+      color: lowStockItemsCount > 0 ? 'bg-rose-50/30 border-rose-200 text-rose-800' : 'bg-white border-slate-200 text-slate-900',
+      iconColor: lowStockItemsCount > 0 ? 'text-rose-600 bg-rose-100/70 animate-pulse' : 'text-slate-400 bg-slate-100',
     },
   ];
 
@@ -82,25 +82,26 @@ export function StatsGrid({
     >
       {cards.map((card, idx) => {
         const Icon = card.icon;
+        const isDark = card.color.includes('bg-slate-900');
         return (
           <motion.div
             key={idx}
             variants={itemVariants}
-            className={`bg-white rounded-2xl p-5 border ${card.color} flex items-center justify-between shadow-xs transition-all duration-300 hover:scale-[1.01] hover:shadow-md`}
+            className={`rounded-2xl p-5 border ${card.color} flex items-center justify-between shadow-xs transition-all duration-300 hover:scale-[1.01] hover:shadow-md`}
           >
             <div>
-              <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider">
+              <p className={`text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                 {card.title}
               </p>
-              <h3 className="text-2xl font-bold text-slate-900 mt-1.5 tracking-tight font-display">
+              <h3 className={`text-2xl font-black mt-1.5 tracking-tight font-sans`}>
                 {card.value}
               </h3>
-              <div className="mt-2">
+              <div className="mt-2.5">
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-block ${
-                  card.title === 'Stok i Ulët' && lowStockItemsCount > 0 
-                    ? 'bg-amber-100/80 text-amber-800'
-                    : card.title === 'Vlera e Stokut'
-                    ? 'bg-emerald-50 text-emerald-700'
+                  isDark
+                    ? 'bg-slate-800 text-amber-450 text-amber-400 border border-slate-700/60'
+                    : card.title === 'Stok i Ulët' && lowStockItemsCount > 0 
+                    ? 'bg-rose-100 text-rose-800 font-bold'
                     : 'bg-slate-100 text-slate-600'
                 }`}>
                   {card.sub}
@@ -108,7 +109,7 @@ export function StatsGrid({
               </div>
             </div>
             <div className={`p-3 rounded-xl ${card.iconColor}`}>
-              <Icon className="w-5 h-5" />
+              <Icon className="w-5 h-5 stroke-[2.2]" />
             </div>
           </motion.div>
         );

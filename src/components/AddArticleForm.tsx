@@ -90,17 +90,17 @@ export function AddArticleForm({
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm relative overflow-hidden h-full">
-      <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl pointer-events-none"></div>
+      <div className="absolute top-0 right-0 w-24 h-24 bg-slate-500/5 rounded-full blur-2xl pointer-events-none"></div>
 
       <div className="flex items-center gap-3 mb-5">
-        <div className="p-2 sm:p-2.5 bg-blue-50 rounded-xl text-blue-600">
-          <Tag className="w-5 h-5" />
+        <div className="p-2 sm:p-2.5 bg-slate-900 border border-slate-950 rounded-xl text-amber-500">
+          <Tag className="w-5 h-5 stroke-[2.2]" />
         </div>
         <div>
-          <h2 className="text-base sm:text-lg font-bold font-display text-slate-800">
+          <h2 className="text-base sm:text-lg font-bold text-slate-900">
             Regjistro Artikull të Ri
           </h2>
-          <p className="text-xs text-slate-500">Shto mallra të reja në inventar dhe përcakto çmimet</p>
+          <p className="text-xs text-slate-500">Shto mallra të reja në magazinën Auto Servis Kopaçi</p>
         </div>
       </div>
 
@@ -119,7 +119,7 @@ export function AddArticleForm({
               setTemplateSearchQuery(e.target.value);
               setIsDropdownOpen(true);
             }}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-3 pr-8 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition duration-200"
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-3 pr-8 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition duration-200"
           />
           <div className="absolute right-3 top-3.5 text-slate-400 pointer-events-none">
             <Search className="w-3.5 h-3.5" />
@@ -146,7 +146,7 @@ export function AddArticleForm({
                     className="w-full text-left px-3.5 py-2.5 text-xs hover:bg-slate-50 text-slate-800 transition flex justify-between items-center"
                   >
                     <span className="font-medium text-slate-900">{item.name}</span>
-                    <span className="text-[10px] bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-bold font-sans">
+                    <span className="text-[10px] bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded font-bold font-sans">
                       {item.category}
                     </span>
                   </button>
@@ -174,7 +174,7 @@ export function AddArticleForm({
               placeholder="p.sh. Pllaka Frenash Ate"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition duration-200"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition duration-200"
             />
           </div>
 
@@ -187,7 +187,7 @@ export function AddArticleForm({
               placeholder="p.sh. Sistem Frenimi"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition duration-200"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition duration-200"
             />
           </div>
         </div>
@@ -200,7 +200,7 @@ export function AddArticleForm({
             <select
               value={unit}
               onChange={(e) => setUnit(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition duration-200"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition duration-200"
             >
               <option value="Cope">Cope</option>
               <option value="Liter">Liter</option>
@@ -219,7 +219,7 @@ export function AddArticleForm({
               placeholder="0"
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 font-mono text-center focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition duration-200"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 font-mono text-center focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition duration-200"
             />
           </div>
 
@@ -234,7 +234,7 @@ export function AddArticleForm({
               placeholder="0.00"
               value={purchasePrice}
               onChange={(e) => setPurchasePrice(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 font-mono text-center focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition duration-200"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 font-mono text-center focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition duration-200"
             />
           </div>
 
@@ -249,7 +249,7 @@ export function AddArticleForm({
               placeholder="0.00"
               value={salePrice}
               onChange={(e) => setSalePrice(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 font-mono text-center focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition duration-200"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 font-mono text-center focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition duration-200"
             />
           </div>
         </div>
@@ -261,7 +261,7 @@ export function AddArticleForm({
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                 Kodi i Gjeneruar i Artikullit (SKU)
               </p>
-              <p className="text-xs font-mono font-bold text-blue-600 break-all mt-0.5">
+              <p className="text-xs font-mono font-bold text-slate-700 break-all mt-0.5">
                 {generateCode(name)}
               </p>
             </div>
@@ -270,9 +270,9 @@ export function AddArticleForm({
 
         <button
           type="submit"
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white transition duration-200 rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-200 cursor-pointer active:scale-[0.99]"
+          className="w-full bg-slate-900 hover:bg-slate-800 text-white border border-slate-950 transition duration-200 rounded-xl py-3 text-sm font-bold flex items-center justify-center gap-2 shadow-md hover:shadow-lg cursor-pointer active:scale-[0.99]"
         >
-          <Plus className="w-4 h-4 text-white stroke-[3px]" />
+          <Plus className="w-4 h-4 text-amber-500 stroke-[3px]" />
           Shto Artikullin në Stok
         </button>
       </form>

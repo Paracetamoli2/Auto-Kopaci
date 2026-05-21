@@ -117,7 +117,7 @@ export function StockTable({
             placeholder="Kërko artikuj sipas emrit, kategorisë ose kodit SKU..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition duration-200"
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition duration-200"
           />
         </div>
 
@@ -126,7 +126,7 @@ export function StockTable({
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-3 py-2.5 text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition duration-200 appearance-none"
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-3 py-2.5 text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition duration-200 appearance-none"
           >
             <option value="ALL">Gjithë Kategoritë</option>
             {categories.map((cat) => (
@@ -142,7 +142,7 @@ export function StockTable({
           <select
             value={qtyFilter}
             onChange={(e) => setQtyFilter(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-3 py-2.5 text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition duration-200 appearance-none"
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-3 py-2.5 text-xs sm:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition duration-200 appearance-none"
           >
             <option value="ALL">Gjithë Stoqet</option>
             <option value="LOW_STOCK">Stok i Ulët (≤ 3)</option>
@@ -209,9 +209,9 @@ export function StockTable({
                     {/* Name */}
                     <td className="p-4">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-800">{item.name}</span>
+                        <span className="font-bold text-slate-900">{item.name}</span>
                         {isTemplate && (
-                          <span className="text-[9px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 rounded leading-none">
+                          <span className="text-[9px] font-bold bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded leading-none">
                             Katalog
                           </span>
                         )}
@@ -220,7 +220,7 @@ export function StockTable({
 
                     {/* Category */}
                     <td className="p-4">
-                      <span className="text-xs bg-slate-100 text-slate-600 border border-slate-200 px-2.5 py-1 rounded-full font-bold">
+                      <span className="text-xs bg-slate-100 text-slate-700 border border-slate-200 px-2.5 py-1 rounded-full font-bold">
                         {item.category}
                       </span>
                     </td>
@@ -233,11 +233,11 @@ export function StockTable({
                             type="number"
                             value={editingQty}
                             onChange={(e) => setEditingQty(e.target.value)}
-                            className="w-16 bg-white border border-slate-200 rounded font-bold text-center px-1.5 py-1 text-xs text-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            className="w-16 bg-white border border-slate-300 rounded font-bold text-center px-1.5 py-1 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-900"
                           />
                           <button
                             onClick={() => handleSaveEdit(item.code!)}
-                            className="text-[10px] font-bold bg-blue-600 text-white px-2 py-1 rounded cursor-pointer hover:bg-blue-700 transition"
+                            className="text-[10px] font-bold bg-slate-900 text-white px-2.5 py-1 rounded cursor-pointer hover:bg-slate-800 border border-slate-950 transition"
                           >
                             Ruaj
                           </button>
@@ -260,7 +260,7 @@ export function StockTable({
                           <span className="text-xs text-slate-500">
                             Blerje: € {(item.purchasePrice || 0).toFixed(2)}
                           </span>
-                          <span className="text-[11px] text-blue-600 font-bold">
+                          <span className="text-[11px] text-slate-950 font-black">
                             Shitje: € {(item.salePrice || 0).toFixed(2)}
                           </span>
                         </div>
@@ -273,16 +273,16 @@ export function StockTable({
                         {isTemplate ? (
                           <button
                             onClick={() => onQuickImport(item)}
-                            className="cursor-pointer inline-flex items-center gap-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl px-2.5 py-1.5 text-[11px] font-bold transition duration-200"
+                            className="cursor-pointer inline-flex items-center gap-1 bg-slate-900 hover:bg-slate-800 text-white border border-slate-950 rounded-xl px-2.5 py-1.5 text-[11px] font-bold transition duration-200"
                           >
-                            <PlusCircle className="w-3.5 h-3.5" />
+                            <PlusCircle className="w-3.5 h-3.5 text-amber-500" />
                             Shto në Stok
                           </button>
                         ) : (
                           <>
                             <button
                               onClick={() => handleStartEdit(item.code!, currentQty)}
-                              className="cursor-pointer text-slate-400 hover:text-blue-600 p-1 rounded-md transition duration-200"
+                              className="cursor-pointer text-slate-400 hover:text-amber-500 p-1 rounded-md transition duration-200"
                               title="Përditëso Sasinë"
                             >
                               <Edit className="w-3.5 h-3.5" />

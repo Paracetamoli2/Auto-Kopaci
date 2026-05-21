@@ -625,21 +625,23 @@ export default function App() {
         
         {/* Navigation / Header bar */}
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-slate-900 via-amber-500 to-slate-800"></div>
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-blue-650 bg-blue-600 rounded-xl shadow-lg shadow-blue-500/10 text-white">
-              <Wrench className="w-6 h-6 stroke-[2.5]" />
+            <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl shadow-md text-amber-500 relative flex items-center justify-center">
+              <Wrench className="w-6 h-6 stroke-[2.2]" />
+              <div className="absolute -bottom-1 -right-1 bg-amber-500 w-2.5 h-2.5 rounded-full border border-white"></div>
             </div>
             <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl sm:text-2xl font-bold font-display tracking-tight text-slate-800">
-                  AUTO SERVIS
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 uppercase font-sans">
+                  AUTO SERVIS <span className="text-amber-500 font-extrabold">KOPAÇI</span>
                 </h1>
-                <span className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-full font-bold">
-                  v3.0 - Magazina & Financa
+                <span className="text-[10px] bg-slate-100 text-slate-700 border border-slate-200 px-2.5 py-0.5 rounded-full font-extrabold uppercase tracking-wider">
+                  v3.2 • Magazina & Financa
                 </span>
               </div>
-              <p className="text-xs text-slate-500 font-medium font-sans">
-                Sistemi Profesional për Menaxhimin e Inventarit të Pjesëve të Këmbimit
+              <p className="text-xs text-slate-500 font-medium font-sans mt-0.5">
+                Sistemi Profesional për Menaxhimin e Inventarit të Pjesëve të Këmbimit &amp; Shërbimeve Auto
               </p>
             </div>
           </div>

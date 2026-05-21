@@ -923,18 +923,42 @@ async function startServer() {
       const maxLoops = 5;
       let finalPayload: any = null;
 
+      // Define candidate models in sequence for automatic fallback in case of rate limits, high demand, or schema mismatches.
+      // Both 'gemini-3.5-flash' and 'gemini-3.1-flash-lite' are robust and support 'Tool call context circulation'.
+      const candidateModels = ['gemini-3.5-flash', 'gemini-3.1-flash-lite'];
+      let workingModelIndex = 0;
+
       while (loopCount < maxLoops) {
         loopCount++;
 
-        const response = await aiClient.models.generateContent({
-          model: 'gemini-3.5-flash',
-          contents: contents,
-          config: {
-            systemInstruction: "Ju jeni Asistenti Inteligjent AI i 'Auto Servis Kopaçi'. Përdoruesi do të komunikojë me ju kryesisht në Shqip (apo ndonjëherë në Anglisht), me zë ose me shkrim. Detyra juaj kryesore është të kuptoni qëllimin e tyre dhe të kryeni veprime në bazë të kërkesave duke thirrur funksionet 'shto_artikull', 'regjistro_levizje', 'krijo_porosi', 'regjistro_pagese', ose 'lexo_gjendjen_stokut'. Përgjigjuni gjithmonë në Gjuhën Shqipe në mënyrë të qartë, të thjeshtë, profesionale dhe përmbledhëse. Nëse përdoruesi ju kërkon me zë ose me shkrim të shtojë pjesë, bëjë pagesa, ose bëjë urdhër-porosi, përdorni vegla. Pas kryerjes me sukses të veprimit, konfirmoni se çfarë bëtë.",
-            tools: [{ functionDeclarations: [shtoArtikullTool, regjistroLevizjeTool, krijoPorosiTool, regjistroPageseTool, lexoGjendjenStokutTool] }],
-            toolConfig: { includeServerSideToolInvocations: true }
+        let response: any = null;
+        let lastError: any = null;
+
+        // Try candidate models starting from the last working index, falling back sequentially.
+        for (let i = workingModelIndex; i < candidateModels.length; i++) {
+          try {
+            const currentModel = candidateModels[i];
+            response = await aiClient.models.generateContent({
+              model: currentModel,
+              contents: contents,
+              config: {
+                systemInstruction: "Ju jeni Asistenti Inteligjent AI i 'Auto Servis Kopaçi'. Përdoruesi do të komunikojë me ju kryesisht në Shqip (apo ndonjëherë në Anglisht), me zë ose me shkrim. Detyra juaj kryesore është të kuptoni qëllimin e tyre dhe të kryeni veprime në bazë të kërkesave duke thirrur funksionet 'shto_artikull', 'regjistro_levizje', 'krijo_porosi', 'regjistro_pagese', ose 'lexo_gjendjen_stokut'. Përgjigjuni gjithmonë në Gjuhën Shqipe në mënyrë të qartë, të thjeshtë, profesionale dhe përmbledhëse. Nëse përdoruesi ju kërkon me zë ose me shkrim të shtojë pjesë, bëjë pagesa, ose bëjë urdhër-porosi, përdorni vegla. Pas kryerjes me sukses të veprimit, konfirmoni se çfarë bëtë.",
+                tools: [{ functionDeclarations: [shtoArtikullTool, regjistroLevizjeTool, krijoPorosiTool, regjistroPageseTool, lexoGjendjenStokutTool] }]
+              }
+            });
+            workingModelIndex = i;
+            lastError = null;
+            break;
+          } catch (err: any) {
+            console.warn(`Tentimi me modelin ${candidateModels[i]} dështoi:`, err.message || err);
+            lastError = err;
           }
-        });
+        }
+
+        // If no model worked, throw the final error to the caller
+        if (lastError || !response) {
+          throw lastError || new Error("Asnjë nga modelet e listuara nuk ishte në dispozicion.");
+        }
 
         const functionCalls = response.functionCalls;
         if (!functionCalls || functionCalls.length === 0) {
@@ -1162,19 +1186,32 @@ async function startServer() {
       res.json(finalPayload);
     } catch (err: any) {
       console.error('Gabim gjatë procesimit të Gemini:', err);
-      const errMsg = String(err.message || err);
+      const errMsg = String(err.message || err || '');
+      let isQuota = false;
+      try {
+        if (err.message && String(err.message).trim().startsWith('{')) {
+          const parsed = JSON.parse(err.message);
+          if (parsed?.error?.code === 429 || parsed?.error?.status?.includes('EXHAUSTED') || String(parsed?.error?.message).toLowerCase().includes('quota')) {
+            isQuota = true;
+          }
+        }
+      } catch (e) {
+        // Ignored
+      }
       if (
+        isQuota ||
         errMsg.includes('quota') ||
         errMsg.includes('QUOTA') ||
         errMsg.includes('RESOURCE_EXHAUSTED') ||
         errMsg.includes('429') ||
         errMsg.includes('limit') ||
         (err.status && Number(err.status) === 429) ||
-        (err.statusCode && Number(err.statusCode) === 429)
+        (err.statusCode && Number(err.statusCode) === 429) ||
+        (err.error?.code === 429)
       ) {
         return res.status(429).json({
           status: 'quota_exceeded',
-          error: 'Kuota e përdorimit falis të Gemini ka mbaruar (Free tier limit prej 20 kërkesash është tejkaluar).'
+          error: 'Kuota e përdorimit falis të Gemini ka mbaruar (Limiti i kërkesave falas është tejkaluar).'
         });
       }
       res.status(500).json({ error: 'Ndodhi një gabim gjatë përpunimit të inteligjencës artificiale: ' + (err.message || String(err)) });

@@ -4,7 +4,21 @@
  */
 
 import React, { useState } from 'react';
-import { ShoppingBag, Plus, Sparkles, Check, Clock, Trash2 } from 'lucide-react';
+import { 
+  ShoppingBag, 
+  Plus, 
+  Sparkles, 
+  Check, 
+  Clock, 
+  Trash2, 
+  MessageSquare,
+  Printer,
+  X,
+  Eye,
+  Share2,
+  FileText,
+  Search
+} from 'lucide-react';
 import { Article, Order, OrderItem } from '../types';
 
 interface OrderFormProps {
@@ -35,12 +49,15 @@ export function OrderForm({
 }: OrderFormProps) {
   const [supplier, setSupplier] = useState('Autopasion');
   const [articleName, setArticleName] = useState('');
+  const [articleSearchQuery, setArticleSearchQuery] = useState('');
+  const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
   const [quantity, setQuantity] = useState('');
   const [price, setPrice] = useState('');
 
-  const handleArticleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const name = e.target.value;
+  const handleSelectArticleByName = (name: string) => {
     setArticleName(name);
+    setArticleSearchQuery(name);
+    setIsSearchDropdownOpen(false);
     const item = mergedStock.find((a) => a.name === name);
     if (item && item.purchasePrice) {
       setPrice(String(item.purchasePrice));
@@ -66,6 +83,7 @@ export function OrderForm({
 
     setPendingOrderItems([...pendingOrderItems, newItem]);
     setArticleName('');
+    setArticleSearchQuery('');
     setQuantity('');
     setPrice('');
   };
@@ -80,6 +98,29 @@ export function OrderForm({
   };
 
   const pendingTotal = pendingOrderItems.reduce((sum, item) => sum + item.total, 0);
+
+  const handleWhatsAppShareOrder = (order: Order) => {
+    const dateStr = order.date;
+    const supplier = order.supplier;
+
+    let text = `*📋 AUTOSERVIS - POROSI E RE (FURNITOR)*\n\n`;
+    text += `*🏢 Furnitori:* ${supplier}\n`;
+    text += `*👤 Porositësi:* Selim Kopaçi\n`;
+    text += `*📅 Data:* ${dateStr}\n`;
+    text += `------------------------------------------\n`;
+    text += `*Artikujt e Kërkuar (Masa & Sasia):*\n`;
+
+    order.items.forEach((item, i) => {
+      text += `• *${item.quantity}x* - ${item.article}\n`;
+    });
+
+    text += `------------------------------------------\n`;
+    text += `*_Dërguar nga Programi i Inventarit të Servisit_*`;
+
+    const encodedText = encodeURIComponent(text);
+    const whatsappUrl = `https://wa.me/?text=${encodedText}`;
+    window.open(whatsappUrl, '_blank');
+  };
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm relative overflow-hidden">
@@ -121,18 +162,56 @@ export function OrderForm({
             <label className="block text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">
               Artikulli nga Katalogu *
             </label>
-            <select
-              value={articleName}
-              onChange={handleArticleChange}
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition duration-200"
-            >
-              <option value="">-- Zgjidh artikullin për porosi --</option>
-              {mergedStock.map((a, i) => (
-                <option key={i} value={a.name}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="🔍 Shkruaj emrin e artikullit për ta kërkuar..."
+                value={articleSearchQuery}
+                onFocus={() => setIsSearchDropdownOpen(true)}
+                onBlur={() => setTimeout(() => setIsSearchDropdownOpen(false), 200)}
+                onChange={(e) => {
+                  setArticleSearchQuery(e.target.value);
+                  setArticleName(''); // clear selected name until chosen from list
+                  setIsSearchDropdownOpen(true);
+                }}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-3 pr-8 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition duration-200"
+              />
+              <div className="absolute right-3 top-3 text-slate-400 pointer-events-none">
+                <Search className="w-3.5 h-3.5" />
+              </div>
+
+              {isSearchDropdownOpen && (
+                <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto divide-y divide-slate-100">
+                  {mergedStock
+                    .filter((a) => a.name.toLowerCase().includes(articleSearchQuery.toLowerCase()))
+                    .slice(0, 30) // limit results for speed
+                    .map((a, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => handleSelectArticleByName(a.name)}
+                        className="w-full text-left px-3.5 py-2.5 text-xs hover:bg-slate-50 text-slate-800 transition flex justify-between items-center"
+                      >
+                        <span className="font-medium">{a.name}</span>
+                        {a.quantity !== undefined && (
+                          <span className="text-[10px] bg-slate-100 font-mono text-slate-500 px-1.5 py-0.5 rounded font-bold">
+                            Gjendja: {a.quantity} {a.unit || 'Cope'}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  {mergedStock.filter((a) => a.name.toLowerCase().includes(articleSearchQuery.toLowerCase())).length === 0 && (
+                    <div className="p-3 text-xs text-slate-400 text-center">Nuk u gjet asnjë artikull me këtë emër.</div>
+                  )}
+                </div>
+              )}
+            </div>
+            {articleName && (
+              <div className="mt-1 flex items-center gap-1 text-[11px] text-emerald-700 font-bold">
+                <Check className="w-3 h-3 text-emerald-600 font-bold" />
+                Artikulli u përzgjodh me sukses!
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -277,23 +356,34 @@ export function OrderForm({
                           € {o.total.toFixed(2)}
                         </td>
                         <td className="p-3 text-right">
-                          <button
-                            onClick={() => onToggleOrderStatus(o.id)}
-                            className={`cursor-pointer inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[10px] font-bold transition duration-200 ${
-                              o.completed
-                                ? 'bg-emerald-55 text-emerald-700 border border-emerald-200 bg-emerald-50'
-                                : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200'
-                            }`}
-                          >
-                            {o.completed ? (
-                              <>
-                                <Check className="w-3 h-3 text-emerald-700 stroke-[3px]" />
-                                E Kryer
-                              </>
-                            ) : (
-                              'Marko si e Kryer'
-                            )}
-                          </button>
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleWhatsAppShareOrder(o)}
+                              title="Dërgo me WhatsApp (Vetëm Sasitë)"
+                              className="cursor-pointer inline-flex items-center justify-center p-2 text-emerald-700 hover:text-white bg-emerald-50 hover:bg-emerald-600 border border-emerald-200 rounded-lg transition duration-150"
+                            >
+                              <MessageSquare className="w-3.5 h-3.5 shrink-0" />
+                            </button>
+
+                            <button
+                              onClick={() => onToggleOrderStatus(o.id)}
+                              className={`cursor-pointer inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-[10px] font-bold transition duration-200 ${
+                                o.completed
+                                  ? 'bg-emerald-55 text-emerald-700 border border-emerald-200 bg-emerald-50'
+                                  : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200'
+                              }`}
+                            >
+                              {o.completed ? (
+                                <>
+                                  <Check className="w-3 h-3 text-emerald-700 stroke-[3px]" />
+                                  E Kryer
+                                </>
+                              ) : (
+                                'Marko si e Kryer'
+                              )}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}

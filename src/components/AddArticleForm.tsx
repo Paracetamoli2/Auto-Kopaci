@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { Plus, Tag, HelpCircle, Layers, Clipboard, AlertCircle } from 'lucide-react';
+import { Plus, Tag, HelpCircle, Layers, Clipboard, AlertCircle, Search, Check } from 'lucide-react';
 import { Article, DatabaseItem } from '../types';
 
 interface AddArticleFormProps {
@@ -26,18 +26,8 @@ export function AddArticleForm({
   const [quantity, setQuantity] = useState('');
   const [purchasePrice, setPurchasePrice] = useState('');
   const [salePrice, setSalePrice] = useState('');
-
-  // Handle template selection
-  const handleTemplateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    if (!e.target.value) return;
-    try {
-      const selected: DatabaseItem = JSON.parse(e.target.value);
-      setName(selected.name);
-      setCategory(selected.category);
-    } catch (err) {
-      console.error(err);
-    }
-  };
+  const [templateSearchQuery, setTemplateSearchQuery] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const generateCode = (val: string) => {
     return val
@@ -93,6 +83,7 @@ export function AddArticleForm({
     setPurchasePrice('');
     setSalePrice('');
     setUnit('Cope');
+    setTemplateSearchQuery('');
 
     showFeedback('Artikulli i ri u shtua me sukses në stok!', 'success');
   };
@@ -113,22 +104,62 @@ export function AddArticleForm({
         </div>
       </div>
 
-      <div className="mb-5">
+      <div className="mb-5 relative">
         <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1.5 tracking-wider">
           Zgjidh nga Modelet (Katalogu)
         </label>
-        <select
-          onChange={handleTemplateChange}
-          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition duration-200"
-          value=""
-        >
-          <option value="">-- Zgjidh modelin për plotësim të shpejtë --</option>
-          {databaseItems.map((item, idx) => (
-            <option key={idx} value={JSON.stringify(item)}>
-              {item.name} ({item.category})
-            </option>
-          ))}
-        </select>
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="🔍 Shkruaj emrin e modelit ose kategorisë për t'u plotësuar vetvetiu..."
+            value={templateSearchQuery}
+            onFocus={() => setIsDropdownOpen(true)}
+            onBlur={() => setTimeout(() => setIsDropdownOpen(false), 200)}
+            onChange={(e) => {
+              setTemplateSearchQuery(e.target.value);
+              setIsDropdownOpen(true);
+            }}
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-3 pr-8 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition duration-200"
+          />
+          <div className="absolute right-3 top-3.5 text-slate-400 pointer-events-none">
+            <Search className="w-3.5 h-3.5" />
+          </div>
+
+          {isDropdownOpen && (
+            <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto divide-y divide-slate-100 z-50">
+              {databaseItems
+                .filter((item) =>
+                  item.name.toLowerCase().includes(templateSearchQuery.toLowerCase()) ||
+                  item.category.toLowerCase().includes(templateSearchQuery.toLowerCase())
+                )
+                .slice(0, 30)
+                .map((item, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      setName(item.name);
+                      setCategory(item.category);
+                      setTemplateSearchQuery(item.name);
+                      setIsDropdownOpen(false);
+                    }}
+                    className="w-full text-left px-3.5 py-2.5 text-xs hover:bg-slate-50 text-slate-800 transition flex justify-between items-center"
+                  >
+                    <span className="font-medium text-slate-900">{item.name}</span>
+                    <span className="text-[10px] bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-bold font-sans">
+                      {item.category}
+                    </span>
+                  </button>
+                ))}
+              {databaseItems.filter((item) =>
+                item.name.toLowerCase().includes(templateSearchQuery.toLowerCase()) ||
+                item.category.toLowerCase().includes(templateSearchQuery.toLowerCase())
+              ).length === 0 && (
+                <div className="p-3 text-xs text-slate-400 text-center">Nuk u gjet asnjë model me këtë emër.</div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">

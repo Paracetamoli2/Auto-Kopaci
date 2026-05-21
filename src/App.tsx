@@ -33,6 +33,7 @@ import { OrderForm } from './components/OrderForm';
 import { LiabilityCard } from './components/LiabilityCard';
 import { MovementHistory } from './components/MovementHistory';
 import { SheetsPanel } from './components/SheetsPanel';
+import { ExportBackupPanel } from './components/ExportBackupPanel';
 
 const DATABASE_ITEMS: DatabaseItem[] = [
   { name: 'Vaj Motorri 5W30', category: 'Lubrifikant' },
@@ -61,7 +62,19 @@ export default function App() {
   const [pendingOrderItems, setPendingOrderItems] = useState<OrderItem[]>([]);
   const [pendingMovementItems, setPendingMovementItems] = useState<Movement[]>([]);
   const [currentTime, setCurrentTime] = useState('');
-  const [activePanel, setActivePanel] = useState<'NONE' | 'LIABILITIES' | 'ORDERS' | 'HISTORY' | 'SHEETS'>('NONE');
+  const [activePanel, setActivePanel] = useState<'NONE' | 'LIABILITIES' | 'ORDERS' | 'HISTORY' | 'SHEETS' | 'BACKUP'>('NONE');
+
+  const [customTemplates, setCustomTemplates] = useState<DatabaseItem[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('custom_templates') || '[]');
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('custom_templates', JSON.stringify(customTemplates));
+  }, [customTemplates]);
 
   // Load and Migrate State from SQLite
   useEffect(() => {
@@ -207,6 +220,21 @@ export default function App() {
     }
   });
 
+  // Combine native presets, custom persisted templates from localStorage, and all dynamically registered articles
+  const allTemplates: DatabaseItem[] = [...DATABASE_ITEMS];
+  
+  customTemplates.forEach(t => {
+    if (!allTemplates.some(item => item.name.toLowerCase() === t.name.toLowerCase())) {
+      allTemplates.push(t);
+    }
+  });
+
+  articles.forEach(art => {
+    if (!allTemplates.some(item => item.name.toLowerCase() === art.name.toLowerCase())) {
+      allTemplates.push({ name: art.name, category: art.category });
+    }
+  });
+
   // Master KPI computations
   const totalStockValue = articles.reduce((sum, a) => sum + (a.quantity * a.purchasePrice), 0);
   const lowStockItemsCount = articles.filter(a => a.quantity <= 3).length;
@@ -238,6 +266,17 @@ export default function App() {
       });
       if (!res.ok) throw new Error();
       await refreshState();
+      
+      // Permanently append to custom templates list so it's always available in the models catalogue
+      setCustomTemplates(prev => {
+        const itemExists = prev.some(t => t.name.toLowerCase() === newArt.name.toLowerCase()) || 
+                           DATABASE_ITEMS.some(t => t.name.toLowerCase() === newArt.name.toLowerCase());
+        if (!itemExists) {
+          return [...prev, { name: newArt.name, category: newArt.category }];
+        }
+        return prev;
+      });
+
       showFeedback(`Artikulli '${newArt.name}' u regjistrua me sukses!`, 'success');
     } catch {
       showFeedback('Gabim gjatë ruajtjes së artikullit në bazën e të dhënave SQLite.', 'error');
@@ -303,6 +342,17 @@ export default function App() {
       });
       if (!res.ok) throw new Error();
       await refreshState();
+
+      // Persist in custom templates list as well
+      setCustomTemplates(prev => {
+        const itemExists = prev.some(t => t.name.toLowerCase() === item.name.toLowerCase()) || 
+                           DATABASE_ITEMS.some(t => t.name.toLowerCase() === item.name.toLowerCase());
+        if (!itemExists) {
+          return [...prev, { name: item.name, category: item.category }];
+        }
+        return prev;
+      });
+
       showFeedback(`U aktivizua '${item.name}' në stok me sasi fillestare 0.`, 'success');
     } catch {
       showFeedback('Dështoi aktivizimi i artikullit në SQLite.', 'error');
@@ -471,6 +521,27 @@ export default function App() {
     }
   };
 
+  const handleImportBackup = async (importedData: {
+    articles: Article[];
+    movements: Movement[];
+    orders: Order[];
+    payments: Payment[];
+  }): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/sync/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(importedData)
+      });
+      if (!res.ok) throw new Error();
+      await refreshState();
+      return true;
+    } catch (err) {
+      console.error(err);
+      return false;
+    }
+  };
+
   const suppliers = ['Autopasion', 'Intercars', 'Te tjera'];
 
   return (
@@ -622,6 +693,18 @@ export default function App() {
               <FileSpreadsheet className="w-4 h-4 shrink-0 text-emerald-600" />
               Google Sheets
             </button>
+
+            <button
+              onClick={() => setActivePanel(activePanel === 'BACKUP' ? 'NONE' : 'BACKUP')}
+              className={`flex-1 sm:flex-none cursor-pointer text-xs font-bold py-2.5 px-4 rounded-xl border transition-all duration-200 flex items-center justify-center gap-2 ${
+                activePanel === 'BACKUP'
+                  ? 'bg-blue-50 border-blue-200 text-blue-700 shadow-sm'
+                  : 'bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-600'
+              }`}
+            >
+              <Database className="w-4 h-4 shrink-0 text-blue-600" />
+              Eksporto & Backup
+            </button>
           </div>
         </div>
 
@@ -678,6 +761,18 @@ export default function App() {
                   />
                 </div>
               )}
+              {activePanel === 'BACKUP' && (
+                <div className="pb-2">
+                  <ExportBackupPanel
+                    articles={articles}
+                    movements={movements}
+                    orders={orders}
+                    payments={payments}
+                    onImportBackup={handleImportBackup}
+                    showFeedback={showFeedback}
+                  />
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -686,7 +781,7 @@ export default function App() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Add Article Form */}
           <AddArticleForm
-            databaseItems={DATABASE_ITEMS}
+            databaseItems={allTemplates}
             articles={articles}
             onAddArticle={handleAddArticle}
             showFeedback={showFeedback}
